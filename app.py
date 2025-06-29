@@ -5,7 +5,7 @@ def render_pilar1_originador():
     """
     Renderiza os inputs e a lógica de cálculo para o Pilar 1.
     """
-    st.header("Pilar 1: Análise do Originador/Devedor (Peso: 20%)")
+    st.header("Pilar 1: Análise do Originadorssss/Devedor (Peso: 20%)")
 
     # Dicionário para armazenar os inputs do usuário
     inputs_pilar1 = {}
