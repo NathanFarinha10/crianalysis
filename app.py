@@ -1,10 +1,12 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import numpy_financial as npf # <-- AJUSTE 1: NOVA IMPORTAÇÃO
 
 # --------------------------------------------------------------------------
 # FUNÇÕES DE CÁLCULO DE SCORE (PILARES 1, 2, 3, 4)
 # --------------------------------------------------------------------------
+# (O código para as funções dos Pilares 1 a 4 permanece o mesmo e está omitido por brevidade)
 def calcular_score_governanca(inputs):
     scores = []
     map_ubo = {"Sim": 1, "Parcialmente": 3, "Não": 5}; scores.append(map_ubo[inputs['ubo']])
@@ -206,7 +208,10 @@ def run_cashflow_simulation(inputs, cenario_premissas):
     for mes in range(1, prazo + 1):
         if saldo_lastro < 1 or saldo_cri < 1: break
         juros_recebido = saldo_lastro * taxa_juros_lastro_am
-        pmt_lastro = np.pmt(taxa_juros_lastro_am, prazo - mes + 1, -saldo_lastro) if taxa_juros_lastro_am > 0 else saldo_lastro / (prazo - mes + 1)
+        
+        # <-- AJUSTE 2: Trocar np.pmt por npf.pmt
+        pmt_lastro = npf.pmt(taxa_juros_lastro_am, prazo - mes + 1, -saldo_lastro) if taxa_juros_lastro_am > 0 else saldo_lastro / (prazo - mes + 1)
+        
         amortizacao_recebida = pmt_lastro - juros_recebido
         novos_defaults = saldo_lastro * taxa_inadimplencia_am
         defaults_pendentes[mes] = novos_defaults
@@ -267,8 +272,7 @@ pilar_selecionado = st.sidebar.radio("Selecione o pilar para análise:",
 # --- CORPO PRINCIPAL DA APLICAÇÃO ---
 
 if pilar_selecionado == "Pilar 1: Originador/Devedor":
-    st.header("Pilar 1: Análise do Risco do Originador/Devedor")
-    st.markdown("Peso no Scorecard Mestre: **20%**")
+    st.header("Pilar 1: Análise do Risco do Originador/Devedor"); st.markdown("Peso no Scorecard Mestre: **20%**")
     inputs_pilar1 = {}
     with st.expander("Fator 1: Governança e Reputação (Peso: 30%)", expanded=True):
         inputs_pilar1['ubo'] = st.radio("Os beneficiários finais (UBOs) estão claramente identificados?", ["Sim", "Parcialmente", "Não"])
@@ -304,8 +308,7 @@ if pilar_selecionado == "Pilar 1: Originador/Devedor":
     if st.button("Calcular Score do Pilar 1"):
         score_gov = calcular_score_governanca(inputs_pilar1); score_op = calcular_score_operacional(inputs_pilar1); score_fin = calcular_score_financeiro(inputs_pilar1)
         score_final_pilar1 = (score_gov * 0.30) + (score_op * 0.30) + (score_fin * 0.40)
-        st.subheader("Resultado da Análise - Pilar 1")
-        col1, col2, col3, col4 = st.columns(4)
+        st.subheader("Resultado da Análise - Pilar 1"); col1, col2, col3, col4 = st.columns(4)
         col1.metric("Score Governança", f"{score_gov:.2f}"); col2.metric("Score Operacional", f"{score_op:.2f}"); col3.metric("Score Financeiro", f"{score_fin:.2f}"); col4.metric("Score Final Ponderado (Pilar 1)", f"{score_final_pilar1:.2f}")
         st.session_state.scores['pilar1'] = score_final_pilar1
         st.success("Cálculo do Pilar 1 concluído e salvo!")
@@ -329,8 +332,7 @@ elif pilar_selecionado == "Pilar 2: Lastro":
         if st.button("Calcular Score do Pilar 2 (Projeto)"):
             score_final, s_viab, s_com, s_exec = calcular_score_lastro_projeto(inputs_pilar2_proj)
             st.session_state.scores['pilar2'] = score_final
-            st.subheader("Resultado da Análise - Pilar 2 (Projeto)")
-            col1, col2, col3, col4 = st.columns(4)
+            st.subheader("Resultado da Análise - Pilar 2 (Projeto)"); col1, col2, col3, col4 = st.columns(4)
             col1.metric("Score Viabilidade", f"{s_viab:.2f}"); col2.metric("Score Comercial", f"{s_com:.2f}"); col3.metric("Score Execução", f"{s_exec:.2f}"); col4.metric("Score Final Ponderado (Pilar 2)", f"{score_final:.2f}", delta_color="off")
             st.success("Cálculo do Pilar 2 concluído e salvo!")
     else:
@@ -346,8 +348,7 @@ elif pilar_selecionado == "Pilar 2: Lastro":
         if st.button("Calcular Score do Pilar 2 (Carteira)"):
             score_final, s_qual, s_perf, s_conc = calcular_score_lastro_carteira(inputs_pilar2_cart)
             st.session_state.scores['pilar2'] = score_final
-            st.subheader("Resultado da Análise - Pilar 2 (Carteira)")
-            col1, col2, col3, col4 = st.columns(4)
+            st.subheader("Resultado da Análise - Pilar 2 (Carteira)"); col1, col2, col3, col4 = st.columns(4)
             col1.metric("Score Qualidade", f"{s_qual:.2f}"); col2.metric("Score Performance", f"{s_perf:.2f}"); col3.metric("Score Concentração", f"{s_conc:.2f}"); col4.metric("Score Final Ponderado (Pilar 2)", f"{score_final:.2f}", delta_color="off")
             st.success("Cálculo do Pilar 2 concluído e salvo!")
 
@@ -370,8 +371,7 @@ elif pilar_selecionado == "Pilar 3: Estrutura":
     if st.button("Calcular Score do Pilar 3"):
         score_final, s_cap, s_ref, s_gar = calcular_score_estrutura(inputs_pilar3)
         st.session_state.scores['pilar3'] = score_final
-        st.subheader("Resultado da Análise - Pilar 3")
-        col1, col2, col3, col4 = st.columns(4)
+        st.subheader("Resultado da Análise - Pilar 3"); col1, col2, col3, col4 = st.columns(4)
         col1.metric("Score Estrutura Capital", f"{s_cap:.2f}"); col2.metric("Score Mecanismos", f"{s_ref:.2f}"); col3.metric("Score Garantias", f"{s_gar:.2f}"); col4.metric("Score Final Ponderado (Pilar 3)", f"{score_final:.2f}")
         st.success("Cálculo do Pilar 3 concluído e salvo!")
 
@@ -394,8 +394,7 @@ elif pilar_selecionado == "Pilar 4: Jurídico/Governança":
     if st.button("Calcular Score do Pilar 4"):
         score_final, s_conf, s_prest, s_cont = calcular_score_juridico(inputs_pilar4)
         st.session_state.scores['pilar4'] = score_final
-        st.subheader("Resultado da Análise - Pilar 4")
-        col1, col2, col3, col4 = st.columns(4)
+        st.subheader("Resultado da Análise - Pilar 4"); col1, col2, col3, col4 = st.columns(4)
         col1.metric("Score Conflitos", f"{s_conf:.2f}"); col2.metric("Score Prestadores", f"{s_prest:.2f}"); col3.metric("Score Contratual", f"{s_cont:.2f}"); col4.metric("Score Final Ponderado (Pilar 4)", f"{score_final:.2f}")
         st.success("Cálculo do Pilar 4 concluído e salvo!")
 
