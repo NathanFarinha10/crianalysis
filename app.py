@@ -5,7 +5,6 @@ import numpy as np
 # --------------------------------------------------------------------------
 # FUNÇÕES DE CÁLCULO DE SCORE (PILARES 1, 2, 3, 4)
 # --------------------------------------------------------------------------
-# (O código para as funções dos Pilares 1 a 4 permanece o mesmo e está omitido por brevidade)
 def calcular_score_governanca(inputs):
     scores = []
     map_ubo = {"Sim": 1, "Parcialmente": 3, "Não": 5}; scores.append(map_ubo[inputs['ubo']])
@@ -231,11 +230,8 @@ def run_cashflow_simulation(inputs, cenario_premissas):
         historico.append({'Mês': mes, 'Saldo Devedor Lastro': saldo_lastro, 'Saldo Devedor CRI': saldo_cri, 'DSCR': dscr})
     perda_principal = saldo_cri
     return perda_principal, pd.DataFrame(historico)
-# --------------------------------------------------------------------------
-# FUNÇÕES DE CONVERSÃO E AJUSTE DE RATING (NOVO CÓDIGO)
-# --------------------------------------------------------------------------
+
 def converter_score_para_rating(score):
-    """Converte a pontuação final (1-5) para uma notação de rating."""
     if score <= 1.25: return 'brAAA(sf)'
     elif score <= 1.75: return 'brAA(sf)'
     elif score <= 2.25: return 'brA(sf)'
@@ -245,7 +241,6 @@ def converter_score_para_rating(score):
     else: return 'brCCC(sf)'
 
 def ajustar_rating(rating_base, notches):
-    """Ajusta um rating para cima ou para baixo em 'n' notches."""
     escala = ['brCCC(sf)', 'brB(sf)', 'brBB(sf)', 'brBBB(sf)', 'brA(sf)', 'brAA(sf)', 'brAAA(sf)']
     try:
         idx_base = escala.index(rating_base)
@@ -269,75 +264,220 @@ pilar_selecionado = st.sidebar.radio("Selecione o pilar para análise:",
     ["Pilar 1: Originador/Devedor", "Pilar 2: Lastro", "Pilar 3: Estrutura", 
      "Pilar 4: Jurídico/Governança", "Pilar 5: Teste de Estresse", "Resultado Final"])
 
-# ... Páginas dos Pilares 1 a 5 omitidas por brevidade ...
+# --- CORPO PRINCIPAL DA APLICAÇÃO ---
 
-# --------------------------------------------------------------------------
-# PÁGINA FINAL - RESULTADO (NOVO CÓDIGO)
-# --------------------------------------------------------------------------
+if pilar_selecionado == "Pilar 1: Originador/Devedor":
+    st.header("Pilar 1: Análise do Risco do Originador/Devedor")
+    st.markdown("Peso no Scorecard Mestre: **20%**")
+    inputs_pilar1 = {}
+    with st.expander("Fator 1: Governança e Reputação (Peso: 30%)", expanded=True):
+        inputs_pilar1['ubo'] = st.radio("Os beneficiários finais (UBOs) estão claramente identificados?", ["Sim", "Parcialmente", "Não"])
+        inputs_pilar1['conselho'] = st.selectbox("Qual a estrutura do conselho de administração?", ["Independente e atuante", "Majoritariamente independente", "Consultivo/Sem independência", "Inexistente"])
+        inputs_pilar1['comites'] = st.checkbox("Possui comitê de auditoria e/ou riscos formalizado?")
+        inputs_pilar1['auditoria'] = st.selectbox("As demonstrações financeiras são auditadas por:", ["Big Four", "Outra auditoria de mercado", "Não auditado"])
+        inputs_pilar1['ressalvas'] = st.checkbox("Houve ressalvas relevantes na última auditoria?")
+        inputs_pilar1['compliance'] = st.selectbox("Maturidade das políticas de compliance e risco:", ["Maduras e implementadas", "Em desenvolvimento", "Inexistentes ou ad-hoc"])
+        inputs_pilar1['litigios'] = st.selectbox("Nível de litígios relevantes (cíveis, fiscais, ambientais):", ["Inexistente ou irrelevante", "Baixo impacto financeiro", "Médio impacto potencial", "Alto impacto / Risco para a operação"])
+        inputs_pilar1['renegociacao'] = st.checkbox("Há histórico de atraso ou renegociação de dívidas com credores?")
+        inputs_pilar1['midia_negativa'] = st.checkbox("Identificado envolvimento em notícias negativas de grande impacto ou investigações?")
+    with st.expander("Fator 2: Histórico Operacional (Peso: 30%)"):
+        inputs_pilar1['track_record'] = st.selectbox("Histórico de entrega de projetos (prazo e orçamento):", ["Consistente e previsível", "Desvios esporádicos", "Atrasos e estouros recorrentes"])
+        inputs_pilar1['reputacao'] = st.selectbox("Reputação e nível de satisfação de clientes (ex: Reclame Aqui):", ["Positiva, baixo volume de queixas", "Neutra, volume gerenciável", "Negativa, alto volume de queixas sem resolução"])
+        inputs_pilar1['politica_formalizada'] = st.checkbox("A política de concessão de crédito é formalizada e documentada?")
+        inputs_pilar1['analise_credito'] = st.selectbox("A análise de crédito para os recebíveis inclui:", ["Score de crédito, análise de renda (DTI) e garantias", "Apenas análise de renda e garantias", "Análise simplificada ou ad-hoc"])
+    with st.expander("Fator 3: Saúde Financeira (Peso: 40%)"):
+        inputs_pilar1['modalidade'] = st.radio("Selecione a modalidade de análise financeira:", ('Análise Corporativa (Holding/Incorporadora)', 'Análise de Projeto (SPE)'))
+        if inputs_pilar1['modalidade'] == 'Análise Corporativa (Holding/Incorporadora)':
+            st.info("Preencha os indicadores financeiros consolidados da empresa.")
+            inputs_pilar1['dl_ebitda'] = st.number_input("Dívida Líquida / EBITDA", value=3.0, format="%.2f")
+            inputs_pilar1['liq_corrente'] = st.number_input("Liquidez Corrente", value=1.2, format="%.2f")
+            inputs_pilar1['fco_divida'] = st.number_input("FCO / Dívida Total (%)", value=15.0, format="%.1f")
+        else:
+            st.info("Preencha os indicadores financeiros específicos do projeto/SPE.")
+            inputs_pilar1['divida_projeto'] = st.number_input("Dívida Total do Projeto (R$)", min_value=1.0, value=50_000_000.0, format="%.2f")
+            inputs_pilar1['vgv_projeto'] = st.number_input("VGV Total do Projeto (R$)", min_value=1.0, value=100_000_000.0, format="%.2f")
+            inputs_pilar1['custo_remanescente'] = st.number_input("Custo Remanescente da Obra (R$)", min_value=1.0, value=30_000_000.0, format="%.2f")
+            inputs_pilar1['recursos_obra'] = st.number_input("Recursos Disponíveis para Obra (Caixa + CRI) (R$)", min_value=1.0, value=35_000_000.0, format="%.2f")
+            inputs_pilar1['vgv_vendido'] = st.number_input("VGV já Vendido (R$)", min_value=1.0, value=60_000_000.0, format="%.2f")
+            inputs_pilar1['sd_cri'] = st.number_input("Saldo Devedor do CRI (R$)", min_value=1.0, value=50_000_000.0, format="%.2f")
+    st.markdown("---")
+    if st.button("Calcular Score do Pilar 1"):
+        score_gov = calcular_score_governanca(inputs_pilar1); score_op = calcular_score_operacional(inputs_pilar1); score_fin = calcular_score_financeiro(inputs_pilar1)
+        score_final_pilar1 = (score_gov * 0.30) + (score_op * 0.30) + (score_fin * 0.40)
+        st.subheader("Resultado da Análise - Pilar 1")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Score Governança", f"{score_gov:.2f}"); col2.metric("Score Operacional", f"{score_op:.2f}"); col3.metric("Score Financeiro", f"{score_fin:.2f}"); col4.metric("Score Final Ponderado (Pilar 1)", f"{score_final_pilar1:.2f}")
+        st.session_state.scores['pilar1'] = score_final_pilar1
+        st.success("Cálculo do Pilar 1 concluído e salvo!")
+
+elif pilar_selecionado == "Pilar 2: Lastro":
+    st.header("Pilar 2: Análise do Lastro"); st.markdown("Peso no Scorecard Mestre: **30%**")
+    tipo_lastro = st.radio("Selecione a natureza do lastro do CRI:",('Desenvolvimento Imobiliário (Risco de Projeto)', 'Carteira de Recebíveis (Risco de Crédito)'),key="tipo_lastro_selector")
+    st.markdown("---")
+    if tipo_lastro == 'Desenvolvimento Imobiliário (Risco de Projeto)':
+        inputs_pilar2_proj = {}
+        with st.expander("Fator 1: Viabilidade de Mercado (Peso: 25%)", expanded=True):
+            inputs_pilar2_proj['praca'] = st.selectbox("Análise da praça do empreendimento:", ["Forte e favorável", "Moderada", "Fraca ou desfavorável"])
+            inputs_pilar2_proj['produto'] = st.selectbox("Adequação do produto/preço ao público-alvo:", ["Alta aderência, produto competitivo", "Aderência razoável", "Produto ou preço desalinhado com o mercado"])
+        with st.expander("Fator 2: Performance Comercial (Peso: 40%)"):
+            inputs_pilar2_proj['ivv'] = st.number_input("IVV médio mensal do projeto (%)", value=5.0, format="%.2f")
+            inputs_pilar2_proj['vgv_vendido_perc'] = st.slider("Percentual do VGV total já vendido (%)", 0, 100, 40)
+        with st.expander("Fator 3: Risco de Execução (Peso: 35%)"):
+            inputs_pilar2_proj['cronograma'] = st.selectbox("Aderência ao cronograma físico da obra:", ["Adiantado ou no prazo", "Atraso leve (< 3 meses)", "Atraso significativo (3-6 meses)", "Atraso severo (> 6 meses)"])
+            inputs_pilar2_proj['orcamento'] = st.selectbox("Aderência ao orçamento da obra:", ["Dentro do orçamento", "Estouro leve (<5%)", "Estouro moderado (5-10%)", "Estouro severo (>10%)"])
+            inputs_pilar2_proj['fundo_obras'] = st.selectbox("Suficiência do Fundo de Obras para custo remanescente:", ["Suficiente com margem (>110%)", "Suficiente (100-110%)", "Insuficiente (<100%)"])
+        if st.button("Calcular Score do Pilar 2 (Projeto)"):
+            score_final, s_viab, s_com, s_exec = calcular_score_lastro_projeto(inputs_pilar2_proj)
+            st.session_state.scores['pilar2'] = score_final
+            st.subheader("Resultado da Análise - Pilar 2 (Projeto)")
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Score Viabilidade", f"{s_viab:.2f}"); col2.metric("Score Comercial", f"{s_com:.2f}"); col3.metric("Score Execução", f"{s_exec:.2f}"); col4.metric("Score Final Ponderado (Pilar 2)", f"{score_final:.2f}", delta_color="off")
+            st.success("Cálculo do Pilar 2 concluído e salvo!")
+    else:
+        inputs_pilar2_cart = {}
+        with st.expander("Fator 1: Qualidade da Carteira (Peso: 40%)", expanded=True):
+             inputs_pilar2_cart['ltv_medio'] = st.number_input("LTV médio ponderado da carteira (%)", value=65.0, format="%.2f")
+             inputs_pilar2_cart['origem'] = st.selectbox("Qualidade da política de crédito que originou a carteira:", ["Robusta e bem documentada (score, DTI, etc.)", "Padrão de mercado", "Frouxa, ad-hoc ou desconhecida"])
+        with st.expander("Fator 2: Performance Histórica (Peso: 40%)"):
+            inputs_pilar2_cart['inadimplencia'] = st.number_input("Índice de inadimplência da carteira (> 90 dias) (%)", value=1.2, format="%.2f")
+            inputs_pilar2_cart['vintage'] = st.selectbox("Análise de safras (vintage) mostra um comportamento:", ["Estável ou melhorando", "Com leve deterioração", "Com deterioração clara e preocupante"])
+        with st.expander("Fator 3: Concentração (Peso: 20%)"):
+            inputs_pilar2_cart['concentracao_top5'] = st.number_input("Concentração da carteira nos 5 maiores devedores (%)", value=6.0, format="%.2f")
+        if st.button("Calcular Score do Pilar 2 (Carteira)"):
+            score_final, s_qual, s_perf, s_conc = calcular_score_lastro_carteira(inputs_pilar2_cart)
+            st.session_state.scores['pilar2'] = score_final
+            st.subheader("Resultado da Análise - Pilar 2 (Carteira)")
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Score Qualidade", f"{s_qual:.2f}"); col2.metric("Score Performance", f"{s_perf:.2f}"); col3.metric("Score Concentração", f"{s_conc:.2f}"); col4.metric("Score Final Ponderado (Pilar 2)", f"{score_final:.2f}", delta_color="off")
+            st.success("Cálculo do Pilar 2 concluído e salvo!")
+
+elif pilar_selecionado == "Pilar 3: Estrutura":
+    st.header("Pilar 3: Análise da Estrutura e Mecanismos de Reforço de Crédito"); st.markdown("Peso no Scorecard Mestre: **30%**")
+    inputs_pilar3 = {}
+    with st.expander("Fator 1: Estrutura de Capital (Peso: 40%)", expanded=True):
+        inputs_pilar3['subordinacao'] = st.number_input("Nível de subordinação (%) para a série em análise", min_value=0.0, max_value=100.0, value=10.0, format="%.2f")
+        inputs_pilar3['waterfall'] = st.selectbox("Qualidade da Cascata de Pagamentos (Waterfall)", ["Clara, protetiva e bem definida", "Padrão de mercado com alguma ambiguidade", "Ambígua, com brechas ou prejudicial à série"])
+    with st.expander("Fator 2: Mecanismos de Reforço e Liquidez (Peso: 30%)"):
+        inputs_pilar3['fundo_reserva_pmts'] = st.number_input("Tamanho do Fundo de Reserva (em nº de pagamentos)", min_value=0.0, value=3.0, step=0.5, format="%.1f")
+        inputs_pilar3['fundo_reserva_regra'] = st.checkbox("O Fundo de Reserva possui mecanismo de recomposição obrigatória?")
+        inputs_pilar3['sobrecolateralizacao'] = st.number_input("Índice de Sobrecolateralização (%)", min_value=100.0, value=110.0, format="%.2f", help="Ex: 110 para 110%")
+        inputs_pilar3['spread_excedente'] = st.number_input("Spread Excedente anualizado (%)", min_value=-5.0, value=1.5, format="%.2f")
+    with st.expander("Fator 3: Qualidade das Garantias (Peso: 30%)"):
+        inputs_pilar3['tipo_garantia'] = st.selectbox("Tipo de garantia predominante na estrutura", ["Alienação Fiduciária de Imóveis", "Cessão Fiduciária de Recebíveis", "Fiança ou Aval", "Sem garantia real (Fidejussória)"])
+        inputs_pilar3['ltv_garantia'] = st.number_input("LTV Médio Ponderado das garantias (%)", min_value=0.0, max_value=200.0, value=60.0, format="%.2f")
+        inputs_pilar3['liquidez_garantia'] = st.selectbox("Liquidez estimada da garantia", ["Alta (ex: aptos residenciais em capital)", "Média (ex: salas comerciais, loteamentos)", "Baixa (ex: imóvel de uso específico, rural)"])
+    st.markdown("---")
+    if st.button("Calcular Score do Pilar 3"):
+        score_final, s_cap, s_ref, s_gar = calcular_score_estrutura(inputs_pilar3)
+        st.session_state.scores['pilar3'] = score_final
+        st.subheader("Resultado da Análise - Pilar 3")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Score Estrutura Capital", f"{s_cap:.2f}"); col2.metric("Score Mecanismos", f"{s_ref:.2f}"); col3.metric("Score Garantias", f"{s_gar:.2f}"); col4.metric("Score Final Ponderado (Pilar 3)", f"{score_final:.2f}")
+        st.success("Cálculo do Pilar 3 concluído e salvo!")
+
+elif pilar_selecionado == "Pilar 4: Jurídico/Governança":
+    st.header("Pilar 4: Análise Jurídica e de Governança da Operação"); st.markdown("Peso no Scorecard Mestre: **20%**")
+    inputs_pilar4 = {}
+    with st.expander("Fator 1: Conflitos de Interesse (Peso: 50%)", expanded=True):
+        inputs_pilar4['independencia'] = st.selectbox("Nível de independência entre Originador, Securitizadora e Gestor", ["Totalmente independentes", "Partes relacionadas com mitigação de conflitos", "Mesmo grupo econômico com alto potencial de conflito"])
+        inputs_pilar4['retencao_risco'] = st.checkbox("O originador/cedente retém a cota subordinada ou outra forma de risco relevante?")
+        inputs_pilar4['historico_decisoes'] = st.selectbox("Histórico de decisões em assembleias do estruturador/originador", ["Alinhado aos interesses dos investidores", "Decisões mistas, alguns waivers aprovados", "Histórico de decisões que beneficiam o devedor"])
+    with st.expander("Fator 2: Qualidade dos Prestadores de Serviço (Peso: 30%)"):
+        inputs_pilar4['ag_fiduciario'] = st.selectbox("Reputação e experiência do Agente Fiduciário", ["Alta, com histórico de proatividade", "Média, cumpre o papel protocolar", "Baixa, passivo ou com histórico negativo"])
+        inputs_pilar4['securitizadora'] = st.selectbox("Reputação e experiência da Securitizadora", ["Alta, experiente e com bom histórico", "Média, com histórico misto", "Nova ou com histórico negativo"])
+        inputs_pilar4['servicer'] = st.selectbox("Qualidade do Agente de Cobrança (Servicer)", ["Alta, com processos e tecnologia robustos", "Padrão de mercado", "Fraca ou inadequada", "Não aplicável / Não avaliado"])
+    with st.expander("Fator 3: Robustez Contratual e Transparência (Peso: 20%)"):
+        inputs_pilar4['covenants'] = st.selectbox("Qualidade e rigidez dos Covenants da operação", ["Fortes, objetivos e com gatilhos claros", "Padrão, com alguma subjetividade", "Fracos, subjetivos ou fáceis de contornar"])
+        inputs_pilar4['pareceres'] = st.selectbox("Qualidade dos pareceres jurídicos (true sale, etc.)", ["Abrangentes e conclusivos (escritório 1ª linha)", "Padrão, cumprem requisitos formais", "Limitados ou com ressalvas"])
+        inputs_pilar4['relatorios'] = st.selectbox("Qualidade e frequência dos relatórios de acompanhamento", ["Alta, detalhados e frequentes", "Média, cumprem o mínimo regulatório", "Baixa, informações inconsistentes ou atrasadas"])
+    st.markdown("---")
+    if st.button("Calcular Score do Pilar 4"):
+        score_final, s_conf, s_prest, s_cont = calcular_score_juridico(inputs_pilar4)
+        st.session_state.scores['pilar4'] = score_final
+        st.subheader("Resultado da Análise - Pilar 4")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Score Conflitos", f"{s_conf:.2f}"); col2.metric("Score Prestadores", f"{s_prest:.2f}"); col3.metric("Score Contratual", f"{s_cont:.2f}"); col4.metric("Score Final Ponderado (Pilar 4)", f"{score_final:.2f}")
+        st.success("Cálculo do Pilar 4 concluído e salvo!")
+
+elif pilar_selecionado == "Pilar 5: Teste de Estresse":
+    st.header("Pilar 5: Modelagem de Fluxo de Caixa e Testes de Estresse"); st.markdown("Esta etapa representa a validação quantitativa da resiliência da operação.")
+    inputs_pilar5 = {}
+    with st.expander("Inputs do Modelo (Dados da Operação)", expanded=True):
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            inputs_pilar5['saldo_lastro'] = st.number_input("Saldo Devedor do Lastro (R$)", value=100_000_000.0, format="%.2f")
+            inputs_pilar5['saldo_cri'] = st.number_input("Saldo Devedor do CRI (Série Sênior) (R$)", value=80_000_000.0, format="%.2f")
+        with c2:
+            inputs_pilar5['taxa_lastro'] = st.number_input("Taxa Média do Lastro (% a.a.)", value=12.0)
+            inputs_pilar5['taxa_cri'] = st.number_input("Taxa da Série Sênior (% a.a.)", value=10.0)
+        with c3:
+            inputs_pilar5['prazo'] = st.number_input("Prazo Remanescente (meses)", value=60)
+            inputs_pilar5['despesas'] = st.number_input("Despesas Fixas Mensais (R$)", value=10000.0)
+    st.markdown("---"); st.subheader("Definição das Premissas dos Cenários")
+    cenarios = {}
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown("#### Cenário Base")
+        cenarios['base'] = {'inadimplencia': st.slider("Inadimplência (% a.a.)", 0.0, 10.0, 2.0, key="inad_base"),'prepagamento': st.slider("Pré-pagamento (% a.a.)", 0.0, 20.0, 10.0, key="prep_base"),'severidade': st.slider("Severidade da Perda (%)", 0, 100, 30, key="sev_base"),'lag': st.slider("Lag de Recuperação (meses)", 0, 24, 12, key="lag_base")}
+    with c2:
+        st.markdown("#### Cenário Moderado")
+        cenarios['moderado'] = {'inadimplencia': st.slider("Inadimplência (% a.a.)", 0.0, 20.0, 5.0, key="inad_mod"),'prepagamento': st.slider("Pré-pagamento (% a.a.)", 0.0, 20.0, 5.0, key="prep_mod"),'severidade': st.slider("Severidade da Perda (%)", 0, 100, 50, key="sev_mod"),'lag': st.slider("Lag de Recuperação (meses)", 0, 24, 18, key="lag_mod")}
+    with c3:
+        st.markdown("#### Cenário Severo")
+        cenarios['severo'] = {'inadimplencia': st.slider("Inadimplência (% a.a.)", 0.0, 40.0, 10.0, key="inad_sev"),'prepagamento': st.slider("Pré-pagamento (% a.a.)", 0.0, 20.0, 2.0, key="prep_sev"),'severidade': st.slider("Severidade da Perda (%)", 0, 100, 70, key="sev_sev"),'lag': st.slider("Lag de Recuperação (meses)", 0, 24, 24, key="lag_sev")}
+    st.markdown("---")
+    if st.button("Executar Simulação de Fluxo de Caixa"):
+        with st.spinner("Simulando cenários... Por favor, aguarde."):
+            perda_base, df_base = run_cashflow_simulation(inputs_pilar5, cenarios['base'])
+            perda_mod, df_mod = run_cashflow_simulation(inputs_pilar5, cenarios['moderado'])
+            perda_sev, df_sev = run_cashflow_simulation(inputs_pilar5, cenarios['severo'])
+            st.session_state.resultados_pilar5 = {'perda_base': perda_base, 'perda_moderado': perda_mod, 'perda_severo': perda_sev}
+            st.subheader("Resultados da Simulação")
+            rc1, rc2, rc3 = st.columns(3)
+            rc1.metric("Perda de Principal (Base)", f"R$ {perda_base:,.2f}")
+            rc2.metric("Perda de Principal (Moderado)", f"R$ {perda_mod:,.2f}")
+            rc3.metric("Perda de Principal (Severo)", f"R$ {perda_sev:,.2f}")
+            st.markdown("---"); st.subheader("Gráficos de Performance")
+            df_dscr = pd.DataFrame({'Base': df_base.set_index('Mês')['DSCR'],'Moderado': df_mod.set_index('Mês')['DSCR'],'Severo': df_sev.set_index('Mês')['DSCR']})
+            st.line_chart(df_dscr); st.caption("Gráfico 1: DSCR (Cobertura do Serviço da Dívida) ao longo do tempo.")
+            df_saldos = pd.DataFrame({'Lastro (Base)': df_base.set_index('Mês')['Saldo Devedor Lastro'],'CRI (Base)': df_base.set_index('Mês')['Saldo Devedor CRI'],'Lastro (Severo)': df_sev.set_index('Mês')['Saldo Devedor Lastro'],'CRI (Severo)': df_sev.set_index('Mês')['Saldo Devedor CRI'],})
+            st.area_chart(df_saldos); st.caption("Gráfico 2: Amortização dos Saldos Devedores do Lastro vs. CRI.")
+
 elif pilar_selecionado == "Resultado Final":
     st.header("Resultado Final e Atribuição de Rating")
-    
-    # Verifica se todos os pilares foram calculados
-    if len(st.session_state.scores) < 4 or not st.session_state.resultados_pilar5:
+    if len(st.session_state.get('scores', {})) < 4 or not st.session_state.get('resultados_pilar5'):
         st.warning("Por favor, calcule todos os 4 pilares de score e execute a simulação do Pilar 5 antes de prosseguir.")
     else:
-        # Ponderações conforme Tabela 8
         pesos = {'pilar1': 0.20, 'pilar2': 0.30, 'pilar3': 0.30, 'pilar4': 0.20}
-        
         score_final_ponderado = sum(st.session_state.scores[p] * pesos[p] for p in pesos)
         rating_indicado = converter_score_para_rating(score_final_ponderado)
-        
         st.subheader("Scorecard Mestre")
-        
-        # Usar um dataframe para a tabela de scores
-        data = {
-            'Componente': [
-                'Pilar 1: Análise do Originador/Devedor',
-                'Pilar 2: Análise do Lastro',
-                'Pilar 3: Análise da Estrutura e Reforços',
-                'Pilar 4: Análise Jurídica e de Governança'
-            ],
-            'Peso': [f"{p*100:.0f}%" for p in pesos.values()],
-            'Pontuação do Pilar (1-5)': [f"{st.session_state.scores.get(p, 0):.2f}" for p in pesos.keys()],
-            'Score Ponderado': [f"{st.session_state.scores.get(p, 0) * pesos[p]:.2f}" for p in pesos.keys()]
-        }
+        data = {'Componente': ['Pilar 1: Análise do Originador/Devedor','Pilar 2: Análise do Lastro','Pilar 3: Análise da Estrutura e Reforços','Pilar 4: Análise Jurídica e de Governança'],'Peso': [f"{p*100:.0f}%" for p in pesos.values()],'Pontuação do Pilar (1-5)': [f"{st.session_state.scores.get(p, 0):.2f}" for p in pesos.keys()],'Score Ponderado': [f"{st.session_state.scores.get(p, 0) * pesos[p]:.2f}" for p in pesos.keys()]}
         df_scores = pd.DataFrame(data)
         st.table(df_scores.set_index('Componente'))
-        
-        st.metric(label="Score Final Ponderado", value=f"{score_final_ponderado:.2f}")
-        st.metric(label="Rating Indicado pelo Score", value=rating_indicado)
-        
+        c1, c2 = st.columns(2)
+        c1.metric(label="Score Final Ponderado", value=f"{score_final_ponderado:.2f}")
+        c2.metric(label="Rating Indicado pelo Score", value=rating_indicado)
         st.markdown("---")
-        
         st.subheader("Validação Quantitativa (Pilar 5)")
         perdas = st.session_state.resultados_pilar5
         perda_moderado = perdas['perda_moderado']
         perda_severo = perdas['perda_severo']
-        
         if perda_moderado < 1:
             st.success("✅ A estrutura suportou o Cenário Moderado sem perdas de principal.")
         else:
             st.error(f"❌ A estrutura NÃO suportou o Cenário Moderado, com perda de R$ {perda_moderado:,.2f}.")
-        
         if perda_severo < 1:
             st.info("ℹ️ A estrutura suportou o Cenário Severo sem perdas de principal.")
         else:
             st.warning(f"⚠️ A estrutura apresentou perda de R$ {perda_severo:,.2f} no Cenário Severo.")
-        
         st.markdown("---")
-        
         st.subheader("Deliberação Final do Comitê de Rating")
-        
         col1, col2 = st.columns([1,2])
-        
         with col1:
             ajuste = st.number_input("Ajuste Qualitativo do Comitê (notches)", min_value=-3, max_value=3, value=0, step=1)
             rating_final = ajustar_rating(rating_indicado, ajuste)
             st.metric(label="Rating Final Atribuído (Série Sênior)", value=rating_final)
-
-            # Campo para o rating da série subordinada
             st.text_input("Rating Final Atribuído (Série Subordinada)", value="Não Avaliado")
-
         with col2:
-            justificativa = st.text_area("Justificativa para o ajuste e comentários finais:", height=250, 
-                                         placeholder="Ex: Ajuste de -1 notch devido aos conflitos de interesse identificados, apesar do bom resultado no teste de estresse...")
+            justificativa = st.text_area("Justificativa para o ajuste e comentários finais:", height=250, placeholder="Ex: Ajuste de -1 notch devido aos conflitos de interesse identificados, apesar do bom resultado no teste de estresse...")
