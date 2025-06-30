@@ -352,20 +352,19 @@ def run_cashflow_simulation(cenario_premissas, saldo_lastro, saldo_cri_p5, taxa_
 # ==============================================================================
 # CORPO PRINCIPAL DA APLICAÇÃO
 # ==============================================================================
-
 st.set_page_config(layout="wide", page_title="Análise e Rating de CRI")
 st.title("Plataforma de Análise e Rating de CRI")
 st.markdown("Desenvolvido em parceria com a IA 'Projeto de Análise e Rating de CRI v2'")
 
 inicializar_session_state()
 
-st.sidebar.header("Pilares da Análise")
-st.sidebar.radio("Selecione o pilar para análise:",
-    ["Pilar 1: Originador/Devedor", "Pilar 2: Lastro", "Pilar 3: Estrutura",
-     "Pilar 4: Jurídico/Governança", "Pilar 5: Teste de Estresse", "Resultado Final"],
-    key='pilar_selecionado')
+# NOVA ARQUITETURA COM ABAS
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    "Pilar 1: Originador", "Pilar 2: Lastro", "Pilar 3: Estrutura",
+    "Pilar 4: Governança", "Pilar 5: Estresse", "Resultado Final"
+])
 
-if st.session_state.pilar_selecionado == "Pilar 1: Originador/Devedor":
+with tab1:
     st.header("Pilar 1: Análise do Risco do Originador/Devedor")
     st.markdown("Peso no Scorecard Mestre: **20%**")
 
@@ -438,8 +437,7 @@ if st.session_state.pilar_selecionado == "Pilar 1: Originador/Devedor":
             st.latex(r'''Score_{P1} = (Score_{Gov} \times 0.3) + (Score_{Op} \times 0.3) + (Score_{Fin} \times 0.4)''')
         st.success("Cálculo do Pilar 1 concluído e salvo na sessão!")
 
-
-elif st.session_state.pilar_selecionado == "Pilar 2: Lastro":
+with tab2:
     st.header("Pilar 2: Análise do Lastro")
     st.markdown("Peso no Scorecard Mestre: **30%**")
 
@@ -484,8 +482,7 @@ elif st.session_state.pilar_selecionado == "Pilar 2: Lastro":
                 st.latex(r'''Score_{P2} = (Score_{Qualidade} \times 0.40) + (Score_{Perf.} \times 0.40) + (Score_{Conc.} \times 0.20)''')
             st.success("Cálculo do Pilar 2 concluído e salvo!")
 
-
-elif st.session_state.pilar_selecionado == "Pilar 3: Estrutura":
+with tab3:
     st.header("Pilar 3: Análise da Estrutura e Mecanismos de Reforço de Crédito")
     st.markdown("Peso no Scorecard Mestre: **30%**")
 
@@ -512,8 +509,7 @@ elif st.session_state.pilar_selecionado == "Pilar 3: Estrutura":
             st.latex(r'''Score_{P3} = (Score_{Capital} \times 0.40) + (Score_{Reforços} \times 0.30) + (Score_{Garantias} \times 0.30)''')
         st.success("Cálculo do Pilar 3 concluído e salvo!")
 
-
-elif st.session_state.pilar_selecionado == "Pilar 4: Jurídico/Governança":
+with tab4:
     st.header("Pilar 4: Análise Jurídica e de Governança da Operação")
     st.markdown("Peso no Scorecard Mestre: **20%**")
 
@@ -541,7 +537,7 @@ elif st.session_state.pilar_selecionado == "Pilar 4: Jurídico/Governança":
         st.success("Cálculo do Pilar 4 concluído e salvo!")
 
 
-elif st.session_state.pilar_selecionado == "Pilar 5: Teste de Estresse":
+with tab5:
     st.header("Pilar 5: Modelagem de Fluxo de Caixa e Testes de Estresse")
     st.markdown("Esta etapa representa a validação quantitativa da resiliência da operação.")
 
@@ -573,12 +569,11 @@ elif st.session_state.pilar_selecionado == "Pilar 5: Teste de Estresse":
 
     st.markdown("---")
     if st.button("Executar Simulação de Fluxo de Caixa", use_container_width=True):
-        inputs_simulacao = {k: st.session_state[k] for k in ['saldo_lastro', 'saldo_cri_p5', 'taxa_lastro', 'taxa_cri_p5', 'prazo', 'despesas']}
         
         with st.spinner("Simulando cenários... Por favor, aguarde."):
-            perda_base, df_base = run_cashflow_simulation(cenarios['base'], **inputs_simulacao)
-            perda_mod, df_mod = run_cashflow_simulation(cenarios['moderado'], **inputs_simulacao)
-            perda_sev, df_sev = run_cashflow_simulation(cenarios['severo'], **inputs_simulacao)
+            perda_base, df_base = run_cashflow_simulation(cenarios['base'], st.session_state.saldo_lastro, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro, st.session_state.taxa_cri_p5, st.session_state.prazo, st.session_state.despesas)
+            perda_mod, df_mod = run_cashflow_simulation(cenarios['moderado'], st.session_state.saldo_lastro, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro, st.session_state.taxa_cri_p5, st.session_state.prazo, st.session_state.despesas)
+            perda_sev, df_sev = run_cashflow_simulation(cenarios['severo'], st.session_state.saldo_lastro, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro, st.session_state.taxa_cri_p5, st.session_state.prazo, st.session_state.despesas)
             st.session_state.resultados_pilar5 = {'perda_base': perda_base, 'perda_moderado': perda_mod, 'perda_severo': perda_sev}
         
         st.subheader("Resultados da Simulação")
@@ -597,7 +592,7 @@ elif st.session_state.pilar_selecionado == "Pilar 5: Teste de Estresse":
         st.caption("Gráfico 2: Amortização dos Saldos Devedores do Lastro vs. CRI.")
 
 
-elif st.session_state.pilar_selecionado == "Resultado Final":
+with tab6:
     st.header("Resultado Final e Atribuição de Rating")
     if len(st.session_state.scores) < 4 or st.session_state.resultados_pilar5 is None:
         st.warning("Por favor, calcule todos os 4 pilares de score e execute a simulação do Pilar 5 antes de prosseguir.")
