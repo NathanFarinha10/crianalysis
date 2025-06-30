@@ -19,6 +19,7 @@ def inicializar_session_state():
         st.session_state.map_data = None
 
         defaults = {
+            'pilar_selecionado': 'Pilar 1: Originador/Devedor',
             # Pilar 1
             'hist_emissor': 'Primeira emissão ou histórico negativo', 'exp_socios': 'Experiência moderada', 'ubo': 'Sim',
             'conselho': 'Consultivo/Sem independência', 'comites': False, 'auditoria': 'Outra auditoria de mercado',
@@ -29,9 +30,14 @@ def inicializar_session_state():
             'dl_ebitda': 3.0, 'liq_corrente': 1.2, 'fco_divida': 15.0, 'divida_projeto': 50000000.0, 'vgv_projeto': 100000000.0,
             'custo_remanescente': 30000000.0, 'recursos_obra': 35000000.0, 'vgv_vendido': 60000000.0, 'sd_cri': 50000000.0,
             # Pilar 2
-            'tipo_lastro': 'Desenvolvimento Imobiliário (Risco de Projeto)', 'segmento_projeto': 'Residencial Vertical',
-            'qualidade_municipio': 'Capital / Metrópole', 'microlocalizacao': 'Boa', 'cidade_mapa': 'São Paulo, SP',
-            'unidades_vendidas_mes': 10, 'unidades_ofertadas_inicio_mes': 150, 'avanco_fisico_obra': 50,
+            'tipo_lastro': 'Desenvolvimento Imobiliário (Risco de Projeto)',
+            'segmento_projeto': 'Residencial Vertical',
+            'qualidade_municipio': 'Capital / Metrópole',
+            'microlocalizacao': 'Boa',
+            'cidade_mapa': 'São Paulo, SP',
+            'unidades_vendidas_mes': 10,
+            'unidades_ofertadas_inicio_mes': 150,
+            'avanco_fisico_obra': 50,
             'cronograma': 'Adiantado ou no prazo', 'orcamento': 'Dentro do orçamento', 'fundo_obras': 'Suficiente (100-110%)',
             'saldo_devedor_carteira': 80_000_000.0, 'valor_garantias_carteira': 120_000_000.0, 'ltv_medio_carteira': 66.7,
             'origem': 'Padrão de mercado', 'inadimplencia': 1.2, 'vintage': 'Com leve deterioração', 'concentracao_top5': 6.0,
@@ -54,8 +60,7 @@ def inicializar_session_state():
             'ajuste_final': 0, 'rating_subordinada': 'Não Avaliado', 'justificativa_final': ''
         }
         for key, value in defaults.items():
-            if key not in st.session_state:
-                st.session_state[key] = value
+            st.session_state[key] = value
 
 @st.cache_data
 def get_coords(city):
@@ -63,7 +68,7 @@ def get_coords(city):
     if not city:
         return None
     try:
-        geolocator = Nominatim(user_agent="cri_analyzer_app_v3")
+        geolocator = Nominatim(user_agent="cri_analyzer_app_v4")
         geocode = RateLimiter(geolocator.geocode, min_delay_seconds=1)
         location = geocode(city)
         if location:
@@ -399,11 +404,14 @@ st.markdown("Desenvolvido em parceria com a IA 'Projeto de Análise e Rating de 
 
 inicializar_session_state()
 
-tab_list = ["Pilar 1: Originador", "Pilar 2: Lastro", "Pilar 3: Estrutura",
-    "Pilar 4: Governança", "Pilar 5: Estresse", "Resultado Final"]
-tabs = st.tabs(tab_list)
+# Arquitetura de Barra Lateral (estável)
+st.sidebar.header("Pilares da Análise")
+st.sidebar.radio("Selecione o pilar para análise:",
+    ["Pilar 1: Originador/Devedor", "Pilar 2: Lastro", "Pilar 3: Estrutura",
+     "Pilar 4: Jurídico/Governança", "Pilar 5: Teste de Estresse", "Resultado Final"],
+    key='pilar_selecionado')
 
-with tabs[0]:
+if st.session_state.pilar_selecionado == "Pilar 1: Originador/Devedor":
     st.header("Pilar 1: Análise do Risco do Originador/Devedor")
     st.markdown("Peso no Scorecard Mestre: **20%**")
 
@@ -476,7 +484,8 @@ with tabs[0]:
             st.latex(r'''Score_{P1} = (Score_{Gov} \times 0.3) + (Score_{Op} \times 0.3) + (Score_{Fin} \times 0.4)''')
         st.success("Cálculo do Pilar 1 concluído e salvo na sessão!")
 
-with tab2:
+
+elif st.session_state.pilar_selecionado == "Pilar 2: Lastro":
     st.header("Pilar 2: Análise do Lastro")
     st.markdown("Peso no Scorecard Mestre: **30%**")
 
@@ -682,7 +691,7 @@ with tab6:
         data = {
             'Componente': ['Pilar 1: Originador/Devedor','Pilar 2: Lastro','Pilar 3: Estrutura e Reforços','Pilar 4: Jurídico/Governança'],
             'Peso': [f"{p*100:.0f}%" for p in pesos.values()],
-            'Pontuação (1-5)': [f"{st.session_state.scores.get(p, 'N/A'):.2f}" for p in pesos.keys()],
+            'Pontuação (1-5)': [f"{st.session_state.scores.get(p, 5.0):.2f}" for p in pesos.keys()],
             'Score Ponderado': [f"{(st.session_state.scores.get(p, 5) * pesos[p]):.2f}" for p in pesos.keys()]
         }
         df_scores = pd.DataFrame(data).set_index('Componente')
