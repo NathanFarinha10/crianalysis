@@ -589,7 +589,7 @@ with tab5:
             st.number_input("Taxa Média do Lastro (% a.a.)", key='taxa_lastro_p5')
             st.number_input("Taxa da Série Sênior (% a.a.)", key='taxa_cri_p5')
         with c3:
-            st.number_input("Prazo Remanescente (meses)", key='prazo_p5', format="%d")
+            st.number_input("Prazo Remanescente (meses)", key='prazo_p5', step=1, format="%d")
             st.number_input("Despesas Fixas Mensais (R$)", key='despesas_p5')
 
     st.markdown("---")
