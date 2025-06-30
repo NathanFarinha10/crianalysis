@@ -15,7 +15,6 @@ def inicializar_session_state():
         st.session_state.scores = {}
         st.session_state.resultados_pilar5 = None
 
-        # Valores padrão para todos os widgets. A chave corresponde ao parâmetro 'key' de cada widget.
         defaults = {
             'pilar_selecionado': 'Pilar 1: Originador/Devedor',
             # Pilar 1
@@ -353,6 +352,7 @@ def run_cashflow_simulation(cenario_premissas, saldo_lastro, saldo_cri_p5, taxa_
 # ==============================================================================
 # CORPO PRINCIPAL DA APLICAÇÃO
 # ==============================================================================
+
 st.set_page_config(layout="wide", page_title="Análise e Rating de CRI")
 st.title("Plataforma de Análise e Rating de CRI")
 st.markdown("Desenvolvido em parceria com a IA 'Projeto de Análise e Rating de CRI v2'")
@@ -573,10 +573,12 @@ elif st.session_state.pilar_selecionado == "Pilar 5: Teste de Estresse":
 
     st.markdown("---")
     if st.button("Executar Simulação de Fluxo de Caixa", use_container_width=True):
+        inputs_simulacao = {k: st.session_state[k] for k in ['saldo_lastro', 'saldo_cri_p5', 'taxa_lastro', 'taxa_cri_p5', 'prazo', 'despesas']}
+        
         with st.spinner("Simulando cenários... Por favor, aguarde."):
-            perda_base, df_base = run_cashflow_simulation(cenarios['base'], st.session_state.saldo_lastro, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro, st.session_state.taxa_cri_p5, st.session_state.prazo, st.session_state.despesas)
-            perda_mod, df_mod = run_cashflow_simulation(cenarios['moderado'], st.session_state.saldo_lastro, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro, st.session_state.taxa_cri_p5, st.session_state.prazo, st.session_state.despesas)
-            perda_sev, df_sev = run_cashflow_simulation(cenarios['severo'], st.session_state.saldo_lastro, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro, st.session_state.taxa_cri_p5, st.session_state.prazo, st.session_state.despesas)
+            perda_base, df_base = run_cashflow_simulation(cenarios['base'], **inputs_simulacao)
+            perda_mod, df_mod = run_cashflow_simulation(cenarios['moderado'], **inputs_simulacao)
+            perda_sev, df_sev = run_cashflow_simulation(cenarios['severo'], **inputs_simulacao)
             st.session_state.resultados_pilar5 = {'perda_base': perda_base, 'perda_moderado': perda_mod, 'perda_severo': perda_sev}
         
         st.subheader("Resultados da Simulação")
@@ -588,8 +590,8 @@ elif st.session_state.pilar_selecionado == "Pilar 5: Teste de Estresse":
         st.markdown("---")
         st.subheader("Gráficos de Performance")
         df_dscr = pd.DataFrame({'Base': df_base.set_index('Mês')['DSCR'],'Moderado': df_mod.set_index('Mês')['DSCR'],'Severo': df_sev.set_index('Mês')['DSCR']})
-        st.line_chart(df_dscr, use_container_width=True)
-        st.caption("Gráfico 1: DSCR (Cobertura do Serviço da Dívida) ao longo do tempo.")
+        st.line_chart(df_dscr, use_container_width=True, y=1.0)
+        st.caption("Gráfico 1: DSCR (Cobertura do Serviço da Dívida) ao longo do tempo. Linha em y=1.0 representa o ponto de equilíbrio.")
         df_saldos = pd.DataFrame({'Lastro (Base)': df_base.set_index('Mês')['Saldo Devedor Lastro'],'CRI (Base)': df_base.set_index('Mês')['Saldo Devedor CRI'],'Lastro (Severo)': df_sev.set_index('Mês')['Saldo Devedor Lastro'],'CRI (Severo)': df_sev.set_index('Mês')['Saldo Devedor CRI'],})
         st.area_chart(df_saldos, use_container_width=True)
         st.caption("Gráfico 2: Amortização dos Saldos Devedores do Lastro vs. CRI.")
@@ -636,7 +638,7 @@ elif st.session_state.pilar_selecionado == "Resultado Final":
         st.subheader("Deliberação Final do Comitê de Rating")
         col1, col2 = st.columns([1,2])
         with col1:
-            st.number_input("Ajuste Qualitativo do Comitê (notches)", min_value=-3, max_value=3, value=0, step=1, key='ajuste_final', help="Permite ao analista ajustar o rating final com base em fatores não capturados pelo modelo. Use valores positivos para subir o rating e negativos para descer.")
+            st.number_input("Ajuste Qualitativo do Comitê (notches)", min_value=-3, max_value=3, step=1, key='ajuste_final', help="Permite ao analista ajustar o rating final com base em fatores não capturados pelo modelo. Use valores positivos para subir o rating e negativos para descer.")
             rating_final = ajustar_rating(rating_indicado, st.session_state.ajuste_final)
             st.metric(label="Rating Final Atribuído (Série Sênior)", value=rating_final)
             st.text_input("Rating Final Atribuído (Série Subordinada)", key='rating_subordinada')
