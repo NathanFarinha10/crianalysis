@@ -625,9 +625,45 @@ with tab5:
         
         st.markdown("---")
         st.subheader("Gráficos de Performance")
-        df_dscr = pd.DataFrame({'Base': df_base.set_index('Mês')['DSCR'],'Moderado': df_mod.set_index('Mês')['DSCR'],'Severo': df_sev.set_index('Mês')['DSCR']})
-        st.line_chart(df_dscr, use_container_width=True, y=1.0)
-        st.caption("Gráfico 1: DSCR (Cobertura do Serviço da Dívida) ao longo do tempo. Linha em y=1.0 representa o ponto de equilíbrio.")
+        st.subheader("Gráficos de Performance")
+
+# Cria o DataFrame com os resultados do DSCR
+df_dscr = pd.DataFrame({
+    'Base': df_base.set_index('Mês')['DSCR'],
+    'Moderado': df_mod.set_index('Mês')['DSCR'],
+    'Severo': df_sev.set_index('Mês')['DSCR']
+})
+
+# Cria uma figura Plotly para o DSCR
+fig_dscr = go.Figure()
+
+# Adiciona uma linha para cada cenário
+for cenario in df_dscr.columns:
+    fig_dscr.add_trace(go.Scatter(x=df_dscr.index, y=df_dscr[cenario],
+                                  mode='lines',
+                                  name=cenario))
+
+# Adiciona a linha de referência horizontal em y=1.0
+fig_dscr.add_hline(y=1.0, line_dash="dot", line_color="red",
+                   annotation_text="DSCR = 1.0x",
+                   annotation_position="bottom right")
+
+# Atualiza o layout do gráfico
+fig_dscr.update_layout(
+    title="DSCR (Cobertura do Serviço da Dívida) por Cenário",
+    xaxis_title="Mês da Operação",
+    yaxis_title="Índice DSCR",
+    legend_title="Cenários"
+)
+
+# Exibe o gráfico Plotly no Streamlit
+st.plotly_chart(fig_dscr, use_container_width=True)
+st.caption("Gráfico 1: Análise da capacidade de pagamento da operação. Valores abaixo de 1.0x indicam insuficiência de caixa para cobrir o serviço da dívida.")
+
+# O restante do código do Gráfico 2 permanece o mesmo
+df_saldos = pd.DataFrame({'Lastro (Base)': df_base.set_index('Mês')['Saldo Devedor Lastro'],'CRI (Base)': df_base.set_index('Mês')['Saldo Devedor CRI'],'Lastro (Severo)': df_sev.set_index('Mês')['Saldo Devedor Lastro'],'CRI (Severo)': df_sev.set_index('Mês')['Saldo Devedor CRI'],})
+st.area_chart(df_saldos, use_container_width=True)
+st.caption("Gráfico 2: Amortização dos Saldos Devedores do Lastro vs. CRI.")
         df_saldos = pd.DataFrame({'Lastro (Base)': df_base.set_index('Mês')['Saldo Devedor Lastro'],'CRI (Base)': df_base.set_index('Mês')['Saldo Devedor CRI'],'Lastro (Severo)': df_sev.set_index('Mês')['Saldo Devedor Lastro'],'CRI (Severo)': df_sev.set_index('Mês')['Saldo Devedor CRI'],})
         st.area_chart(df_saldos, use_container_width=True)
         st.caption("Gráfico 2: Amortização dos Saldos Devedores do Lastro vs. CRI.")
