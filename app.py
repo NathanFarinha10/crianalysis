@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import numpy_financial as npf
 import plotly.graph_objects as go
+from geopy.geocoders import Nominatim
+from geopy.extra.rate_limiter import RateLimiter
 
 # ==============================================================================
 # INICIALIZAÇÃO E FUNÇÕES AUXILIARES
@@ -14,9 +16,9 @@ def inicializar_session_state():
         st.session_state.state_initialized = True
         st.session_state.scores = {}
         st.session_state.resultados_pilar5 = None
+        st.session_state.map_data = None
 
         defaults = {
-            'pilar_selecionado': 'Pilar 1: Originador/Devedor',
             # Pilar 1
             'hist_emissor': 'Primeira emissão ou histórico negativo', 'exp_socios': 'Experiência moderada', 'ubo': 'Sim',
             'conselho': 'Consultivo/Sem independência', 'comites': False, 'auditoria': 'Outra auditoria de mercado',
@@ -27,10 +29,12 @@ def inicializar_session_state():
             'dl_ebitda': 3.0, 'liq_corrente': 1.2, 'fco_divida': 15.0, 'divida_projeto': 50000000.0, 'vgv_projeto': 100000000.0,
             'custo_remanescente': 30000000.0, 'recursos_obra': 35000000.0, 'vgv_vendido': 60000000.0, 'sd_cri': 50000000.0,
             # Pilar 2
-            'tipo_lastro': 'Desenvolvimento Imobiliário (Risco de Projeto)', 'praca': 'Moderada', 'produto': 'Aderência razoável',
-            'ivv': 5.0, 'vgv_vendido_perc': 40, 'cronograma': 'Atraso leve (< 3 meses)', 'orcamento': 'Estouro leve (<5%)',
-            'fundo_obras': 'Suficiente (100-110%)', 'ltv_medio': 65.0, 'origem': 'Padrão de mercado', 'inadimplencia': 1.2,
-            'vintage': 'Com leve deterioração', 'concentracao_top5': 6.0,
+            'tipo_lastro': 'Desenvolvimento Imobiliário (Risco de Projeto)', 'segmento_projeto': 'Residencial Vertical',
+            'qualidade_municipio': 'Capital / Metrópole', 'microlocalizacao': 'Boa', 'cidade_mapa': 'São Paulo, SP',
+            'unidades_vendidas_mes': 10, 'unidades_ofertadas_inicio_mes': 150, 'avanco_fisico_obra': 50,
+            'cronograma': 'Adiantado ou no prazo', 'orcamento': 'Dentro do orçamento', 'fundo_obras': 'Suficiente (100-110%)',
+            'saldo_devedor_carteira': 80_000_000.0, 'valor_garantias_carteira': 120_000_000.0, 'ltv_medio_carteira': 66.7,
+            'origem': 'Padrão de mercado', 'inadimplencia': 1.2, 'vintage': 'Com leve deterioração', 'concentracao_top5': 6.0,
             # Pilar 3
             'subordinacao': 10.0, 'waterfall': 'Padrão de mercado com alguma ambiguidade', 'fundo_reserva_pmts': 3.0,
             'fundo_reserva_regra': True, 'sobrecolateralizacao': 110.0, 'spread_excedente': 1.5,
@@ -41,21 +45,34 @@ def inicializar_session_state():
             'securitizadora': 'Média, com histórico misto', 'servicer': 'Padrão de mercado', 'covenants': 'Padrão, com alguma subjetividade',
             'pareceres': 'Padrão, cumprem requisitos formais', 'relatorios': 'Média, cumprem o mínimo regulatório',
             # Pilar 5
-            'saldo_lastro': 100000000.0, 'saldo_cri_p5': 80000000.0, 'taxa_lastro': 12.0, 'taxa_cri_p5': 10.0,
-            'prazo': 60, 'despesas': 10000.0, 'inad_base': 2.0, 'prep_base': 10.0, 'sev_base': 30, 'lag_base': 12,
+            'saldo_lastro_p5': 100000000.0, 'saldo_cri_p5': 80000000.0, 'taxa_lastro_p5': 12.0, 'taxa_cri_p5': 10.0,
+            'prazo_p5': 60, 'despesas_p5': 10000.0, 'inad_base': 2.0, 'prep_base': 10.0, 'sev_base': 30, 'lag_base': 12,
             'inad_mod': 5.0, 'prep_mod': 5.0, 'sev_mod': 50, 'lag_mod': 18, 'inad_sev': 10.0, 'prep_sev': 2.0, 'sev_sev': 70,
             'lag_sev': 24,
             # Resultado Final
             'ajuste_final': 0, 'rating_subordinada': 'Não Avaliado', 'justificativa_final': ''
         }
         for key, value in defaults.items():
-            if key not in st.session_state:
-                st.session_state[key] = value
+            st.session_state[key] = value
+
+@st.cache_data
+def get_coords(city):
+    """Converte nome de cidade em coordenadas lat/lon."""
+    if not city:
+        return None
+    try:
+        geolocator = Nominatim(user_agent="cri_analyzer_app")
+        geocode = RateLimiter(geolocator.geocode, min_delay_seconds=1)
+        location = geocode(city)
+        if location:
+            return pd.DataFrame({'lat': [location.latitude], 'lon': [location.longitude]})
+    except Exception:
+        return None
 
 def create_gauge_chart(score, title):
-    if score is None: score = 0
+    if score is None: score = 5.0
     fig = go.Figure(go.Indicator(
-        mode="gauge+number", value=score,
+        mode="gauge+number", value=round(score, 2),
         title={'text': title, 'font': {'size': 20}},
         gauge={
             'axis': {'range': [1, 5], 'tickwidth': 1, 'tickcolor': "darkblue"},
@@ -166,15 +183,22 @@ def calcular_score_financeiro():
         return sum(scores) / len(scores) if scores else 5
 
 def calcular_score_lastro_projeto():
-    map_praca = {"Forte e favorável": 1, "Moderada": 3, "Fraca ou desfavorável": 5}
-    map_produto = {"Alta aderência, produto competitivo": 1, "Aderência razoável": 3, "Produto ou preço desalinhado com o mercado": 5}
-    score_viabilidade = (map_praca[st.session_state.praca] + map_produto[st.session_state.produto]) / 2
-    ivv = st.session_state.ivv
-    if ivv > 7: score_ivv = 1
-    elif ivv >= 5: score_ivv = 2
-    elif ivv >= 3: score_ivv = 3
-    elif ivv >= 1: score_ivv = 4
+    map_praca = {"Capital / Metrópole": 1, "Cidade Grande (>500k hab)": 2, "Cidade Média (100-500k hab)": 3, "Cidade Pequena (<100k hab)": 4}
+    map_micro = {"Nobre / Premium": 1, "Boa": 2, "Regular": 4, "Periférica / Risco": 5}
+    map_segmento = {"Residencial Vertical": 1, "Residencial Horizontal (Condomínio)": 2, "Comercial (Salas/Lajes)": 3, "Loteamento": 4, "Multipropriedade": 5}
+    score_localizacao = (map_praca[st.session_state.qualidade_municipio] + map_micro[st.session_state.microlocalizacao]) / 2
+    score_segmento = map_segmento[st.session_state.segmento_projeto]
+    score_viabilidade = (score_localizacao * 0.7) + (score_segmento * 0.3)
+    
+    unid_ofertadas = st.session_state.unidades_ofertadas_inicio_mes
+    ivv_calculado = (st.session_state.unidades_vendidas_mes / unid_ofertadas) * 100 if unid_ofertadas > 0 else 0
+    st.session_state.ivv_calculado = ivv_calculado
+    if ivv_calculado > 7: score_ivv = 1
+    elif ivv_calculado >= 5: score_ivv = 2
+    elif ivv_calculado >= 3: score_ivv = 3
+    elif ivv_calculado >= 1: score_ivv = 4
     else: score_ivv = 5
+    
     vgv_vendido_perc = st.session_state.vgv_vendido_perc
     if vgv_vendido_perc > 70: score_vgv_vendido = 1
     elif vgv_vendido_perc > 50: score_vgv_vendido = 2
@@ -182,19 +206,27 @@ def calcular_score_lastro_projeto():
     elif vgv_vendido_perc > 15: score_vgv_vendido = 4
     else: score_vgv_vendido = 5
     score_comercial = (score_ivv + score_vgv_vendido) / 2
+
     map_cronograma = {"Adiantado ou no prazo": 1, "Atraso leve (< 3 meses)": 2, "Atraso significativo (3-6 meses)": 4, "Atraso severo (> 6 meses)": 5}
-    map_orcamento = {"Dentro do orçamento": 1, "Estouro leve (<5%)": 2, "Estouro moderado (5-10%)": 4, "Estouro severo (>10%)": 5}
-    map_fundo_obras = {"Suficiente com margem (>110%)": 1, "Suficiente (100-110%)": 2, "Insuficiente (<100%)": 5}
-    score_execucao = (map_cronograma[st.session_state.cronograma] + map_orcamento[st.session_state.orcamento] + map_fundo_obras[st.session_state.fundo_obras]) / 3
+    avanco_obra = st.session_state.avanco_fisico_obra
+    if avanco_obra >= 90: score_avanco = 1
+    elif avanco_obra >= 70: score_avanco = 2
+    elif avanco_obra >= 40: score_avanco = 3
+    elif avanco_obra >= 10: score_avanco = 4
+    else: score_avanco = 5
+    score_execucao = (map_cronograma[st.session_state.cronograma] + score_avanco) / 2
+
     score_final = (score_viabilidade * 0.25) + (score_comercial * 0.40) + (score_execucao * 0.35)
     return score_final
 
 def calcular_score_lastro_carteira():
-    ltv_medio = st.session_state.ltv_medio
-    if ltv_medio < 60: score_ltv = 1
-    elif ltv_medio <= 70: score_ltv = 2
-    elif ltv_medio <= 80: score_ltv = 3
-    elif ltv_medio <= 90: score_ltv = 4
+    valor_garantias = st.session_state.valor_garantias_carteira
+    ltv_calculado = (st.session_state.saldo_devedor_carteira / valor_garantias) * 100 if valor_garantias > 0 else 999
+    st.session_state.ltv_medio_carteira = ltv_calculado
+    if ltv_calculado < 60: score_ltv = 1
+    elif ltv_calculado <= 70: score_ltv = 2
+    elif ltv_calculado <= 80: score_ltv = 3
+    elif ltv_calculado <= 90: score_ltv = 4
     else: score_ltv = 5
     map_origem = {"Robusta e bem documentada (score, DTI, etc.)": 1, "Padrão de mercado": 3, "Frouxa, ad-hoc ou desconhecida": 5}
     score_qualidade = (score_ltv + map_origem[st.session_state.origem]) / 2
@@ -358,7 +390,6 @@ st.markdown("Desenvolvido em parceria com a IA 'Projeto de Análise e Rating de 
 
 inicializar_session_state()
 
-# NOVA ARQUITETURA COM ABAS
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "Pilar 1: Originador", "Pilar 2: Lastro", "Pilar 3: Estrutura",
     "Pilar 4: Governança", "Pilar 5: Estresse", "Resultado Final"
@@ -446,33 +477,68 @@ with tab2:
 
     if st.session_state.tipo_lastro == 'Desenvolvimento Imobiliário (Risco de Projeto)':
         with st.expander("Fator 1: Viabilidade de Mercado (Peso: 25%)", expanded=True):
-            st.selectbox("Análise da praça do empreendimento:", ["Forte e favorável", "Moderada", "Fraca ou desfavorável"], key='praca', help="Analisa o potencial de crescimento, renda e infraestrutura da região do projeto.")
-            st.selectbox("Adequação do produto/preço ao público-alvo:", ["Alta aderência, produto competitivo", "Aderência razoável", "Produto ou preço desalinhado com o mercado"], key='produto', help="Verifica se o produto imobiliário faz sentido para a demanda e os preços locais.")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.selectbox("Segmento do Projeto:", ["Residencial Vertical", "Residencial Horizontal (Condomínio)", "Comercial (Salas/Lajes)", "Loteamento", "Multipropriedade"], key='segmento_projeto', help="O risco varia conforme o segmento. Multipropriedade tende a ser mais arriscado que residencial padrão.")
+                st.selectbox("Qualidade do Município:", ["Capital / Metrópole", "Cidade Grande (>500k hab)", "Cidade Média (100-500k hab)", "Cidade Pequena (<100k hab)"], key='qualidade_municipio', help="Cidades maiores tendem a ter mercados imobiliários mais líquidos e resilientes.")
+            with c2:
+                st.selectbox("Qualidade da Microlocalização:", ["Nobre / Premium", "Boa", "Regular", "Periférica / Risco"], key='microlocalizacao', help="A qualidade do bairro e entorno imediato é crucial para a valorização e velocidade de vendas.")
+                st.text_input("Cidade/Estado para Mapa:", key='cidade_mapa', help="Ex: 'Rio de Janeiro, RJ'. Usado para gerar o mapa de localização.")
+        
         with st.expander("Fator 2: Performance Comercial (Peso: 40%)"):
-            st.number_input("IVV médio mensal do projeto (%)", key='ivv', help="Índice de Velocidade de Vendas. Um IVV > 5-7% é forte e reduz o risco de carregamento de estoque.")
-            st.slider("Percentual do VGV total já vendido (%)", 0, 100, key='vgv_vendido_perc', help="Percentual de vendas já contratadas. Quanto maior, menor o risco comercial futuro.")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.number_input("Unidades Vendidas no Último Mês:", min_value=0, key='unidades_vendidas_mes')
+            with c2:
+                st.number_input("Unidades em Oferta no Início do Mês:", min_value=1, key='unidades_ofertadas_inicio_mes')
+            with c3:
+                ivv_calculado = (st.session_state.unidades_vendidas_mes / st.session_state.unidades_ofertadas_inicio_mes) * 100 if st.session_state.unidades_ofertadas_inicio_mes > 0 else 0
+                st.metric("IVV Calculado", f"{ivv_calculado:.2f}%")
+        
         with st.expander("Fator 3: Risco de Execução (Peso: 35%)"):
+            st.slider("Avanço Físico da Obra (%)", 0, 100, key='avanco_fisico_obra', help="Percentual da obra já concluído. Quanto mais avançado, menor o risco de execução.")
             st.selectbox("Aderência ao cronograma físico da obra:", ["Adiantado ou no prazo", "Atraso leve (< 3 meses)", "Atraso significativo (3-6 meses)", "Atraso severo (> 6 meses)"], key='cronograma', help="Atrasos na obra impactam custos e o cronograma de recebimentos.")
             st.selectbox("Aderência ao orçamento da obra:", ["Dentro do orçamento", "Estouro leve (<5%)", "Estouro moderado (5-10%)", "Estouro severo (>10%)"], key='orcamento', help="Estouros no orçamento podem demandar novos aportes ou colocar o projeto em risco.")
             st.selectbox("Suficiência do Fundo de Obras para custo remanescente:", ["Suficiente com margem (>110%)", "Suficiente (100-110%)", "Insuficiente (<100%)"], key='fundo_obras', help="O Fundo de Obras garante a conclusão da construção mesmo com vendas fracas.")
 
-        if st.button("Calcular Score do Pilar 2 (Projeto)", use_container_width=True):
+        if st.button("Calcular Score e Mapa do Pilar 2 (Projeto)", use_container_width=True):
             score_final = calcular_score_lastro_projeto()
             st.session_state.scores['pilar2'] = score_final
+            st.session_state.map_data = get_coords(st.session_state.cidade_mapa)
             st.plotly_chart(create_gauge_chart(score_final, "Score Final Ponderado (Pilar 2)"), use_container_width=True)
             with st.expander("Entenda o Cálculo do Score"):
                 st.markdown("O Score Final é uma média ponderada dos fatores, com pesos baseados na Tabela 5 (Projeto) da metodologia:")
                 st.latex(r'''Score_{P2} = (Score_{Viab.} \times 0.25) + (Score_{Comercial} \times 0.40) + (Score_{Exec.} \times 0.35)''')
             st.success("Cálculo do Pilar 2 concluído e salvo!")
+        
+        st.markdown("---")
+        st.subheader("Painel de Indicadores-Chave (Projeto)")
+        kpi1, kpi2, kpi3 = st.columns(3)
+        kpi1.metric("IVV (Velocidade de Vendas)", f"{st.session_state.get('ivv_calculado', 0):.2f}%")
+        kpi2.metric("Avanço Físico da Obra", f"{st.session_state.avanco_fisico_obra}%")
+        kpi3.metric("Situação do Cronograma", st.session_state.cronograma)
+        if st.session_state.map_data is not None:
+            st.map(st.session_state.map_data, zoom=11)
+            st.caption(f"Localização aproximada de {st.session_state.cidade_mapa}")
+
     else: # Carteira de Recebíveis
         with st.expander("Fator 1: Qualidade da Carteira (Peso: 40%)", expanded=True):
-             st.number_input("LTV médio ponderado da carteira (%)", key='ltv_medio', help="Loan-to-Value. Quanto menor, maior a proteção em caso de execução da garantia.")
-             st.selectbox("Qualidade da política de crédito que originou a carteira:", ["Robusta e bem documentada (score, DTI, etc.)", "Padrão de mercado", "Frouxa, ad-hoc ou desconhecida"], key='origem', help="Uma boa política de crédito na origem reduz a chance de inadimplência futura.")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.number_input("Saldo Devedor Total da Carteira (R$)", key='saldo_devedor_carteira')
+            with c2:
+                st.number_input("Valor de Avaliação Total das Garantias (R$)", key='valor_garantias_carteira')
+            with c3:
+                valor_garantias = st.session_state.valor_garantias_carteira
+                ltv_calculado = (st.session_state.saldo_devedor_carteira / valor_garantias) * 100 if valor_garantias > 0 else 0
+                st.metric("LTV Médio Calculado", f"{ltv_calculado:.2f}%")
+            st.selectbox("Qualidade da política de crédito que originou a carteira:", ["Robusta e bem documentada (score, DTI, etc.)", "Padrão de mercado", "Frouxa, ad-hoc ou desconhecida"], key='origem', help="Uma boa política de crédito na origem reduz a chance de inadimplência futura.")
         with st.expander("Fator 2: Performance Histórica (Peso: 40%)"):
             st.number_input("Índice de inadimplência da carteira (> 90 dias) (%)", key='inadimplencia', help="Principal indicador de performance da carteira.")
             st.selectbox("Análise de safras (vintage) mostra um comportamento:", ["Estável ou melhorando", "Com leve deterioração", "Com deterioração clara e preocupante"], key='vintage', help="Analisa se as safras mais novas performam melhor ou pior que as antigas.")
         with st.expander("Fator 3: Concentração (Peso: 20%)"):
             st.number_input("Concentração da carteira nos 5 maiores devedores (%)", key='concentracao_top5', help="Mede o risco de um default individual impactar a operação. Quanto menor, mais pulverizado e melhor.")
+        
         if st.button("Calcular Score do Pilar 2 (Carteira)", use_container_width=True):
             score_final = calcular_score_lastro_carteira()
             st.session_state.scores['pilar2'] = score_final
@@ -481,6 +547,12 @@ with tab2:
                 st.markdown("O Score Final é uma média ponderada dos fatores, com pesos baseados na Tabela 5 (Carteira) da metodologia:")
                 st.latex(r'''Score_{P2} = (Score_{Qualidade} \times 0.40) + (Score_{Perf.} \times 0.40) + (Score_{Conc.} \times 0.20)''')
             st.success("Cálculo do Pilar 2 concluído e salvo!")
+
+        st.markdown("---")
+        st.subheader("Painel de Indicadores-Chave (Carteira)")
+        kpi1, kpi2 = st.columns(2)
+        kpi1.metric("LTV Médio da Carteira", f"{st.session_state.get('ltv_medio_carteira', 0):.2f}%")
+        kpi2.metric("Inadimplência (>90d)", f"{st.session_state.inadimplencia}%")
 
 with tab3:
     st.header("Pilar 3: Análise da Estrutura e Mecanismos de Reforço de Crédito")
@@ -536,7 +608,6 @@ with tab4:
             st.latex(r'''Score_{P4} = (Score_{Conflitos} \times 0.50) + (Score_{Prestadores} \times 0.30) + (Score_{Contratual} \times 0.20)''')
         st.success("Cálculo do Pilar 4 concluído e salvo!")
 
-
 with tab5:
     st.header("Pilar 5: Modelagem de Fluxo de Caixa e Testes de Estresse")
     st.markdown("Esta etapa representa a validação quantitativa da resiliência da operação.")
@@ -544,14 +615,14 @@ with tab5:
     with st.expander("Inputs do Modelo (Dados da Operação)", expanded=True):
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.number_input("Saldo Devedor do Lastro (R$)", key='saldo_lastro')
+            st.number_input("Saldo Devedor do Lastro (R$)", key='saldo_lastro_p5')
             st.number_input("Saldo Devedor do CRI (Série Sênior) (R$)", key='saldo_cri_p5')
         with c2:
-            st.number_input("Taxa Média do Lastro (% a.a.)", key='taxa_lastro')
+            st.number_input("Taxa Média do Lastro (% a.a.)", key='taxa_lastro_p5')
             st.number_input("Taxa da Série Sênior (% a.a.)", key='taxa_cri_p5')
         with c3:
-            st.number_input("Prazo Remanescente (meses)", key='prazo', format="%d")
-            st.number_input("Despesas Fixas Mensais (R$)", key='despesas')
+            st.number_input("Prazo Remanescente (meses)", key='prazo_p5', format="%d")
+            st.number_input("Despesas Fixas Mensais (R$)", key='despesas_p5')
 
     st.markdown("---")
     st.subheader("Definição das Premissas dos Cenários")
@@ -571,9 +642,9 @@ with tab5:
     if st.button("Executar Simulação de Fluxo de Caixa", use_container_width=True):
         
         with st.spinner("Simulando cenários... Por favor, aguarde."):
-            perda_base, df_base = run_cashflow_simulation(cenarios['base'], st.session_state.saldo_lastro, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro, st.session_state.taxa_cri_p5, st.session_state.prazo, st.session_state.despesas)
-            perda_mod, df_mod = run_cashflow_simulation(cenarios['moderado'], st.session_state.saldo_lastro, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro, st.session_state.taxa_cri_p5, st.session_state.prazo, st.session_state.despesas)
-            perda_sev, df_sev = run_cashflow_simulation(cenarios['severo'], st.session_state.saldo_lastro, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro, st.session_state.taxa_cri_p5, st.session_state.prazo, st.session_state.despesas)
+            perda_base, df_base = run_cashflow_simulation(cenarios['base'], st.session_state.saldo_lastro_p5, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro_p5, st.session_state.taxa_cri_p5, st.session_state.prazo_p5, st.session_state.despesas_p5)
+            perda_mod, df_mod = run_cashflow_simulation(cenarios['moderado'], st.session_state.saldo_lastro_p5, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro_p5, st.session_state.taxa_cri_p5, st.session_state.prazo_p5, st.session_state.despesas_p5)
+            perda_sev, df_sev = run_cashflow_simulation(cenarios['severo'], st.session_state.saldo_lastro_p5, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro_p5, st.session_state.taxa_cri_p5, st.session_state.prazo_p5, st.session_state.despesas_p5)
             st.session_state.resultados_pilar5 = {'perda_base': perda_base, 'perda_moderado': perda_mod, 'perda_severo': perda_sev}
         
         st.subheader("Resultados da Simulação")
@@ -590,7 +661,6 @@ with tab5:
         df_saldos = pd.DataFrame({'Lastro (Base)': df_base.set_index('Mês')['Saldo Devedor Lastro'],'CRI (Base)': df_base.set_index('Mês')['Saldo Devedor CRI'],'Lastro (Severo)': df_sev.set_index('Mês')['Saldo Devedor Lastro'],'CRI (Severo)': df_sev.set_index('Mês')['Saldo Devedor CRI'],})
         st.area_chart(df_saldos, use_container_width=True)
         st.caption("Gráfico 2: Amortização dos Saldos Devedores do Lastro vs. CRI.")
-
 
 with tab6:
     st.header("Resultado Final e Atribuição de Rating")
