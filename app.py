@@ -20,7 +20,7 @@ def inicializar_session_state():
         st.session_state.map_data = None
 
         defaults = {
-            # Aba Cadastro
+            # --- Novas chaves para a aba de Cadastro ---
             'op_nome': 'CRI Exemplo Towers',
             'op_codigo': 'EXMP11',
             'op_securitizadora': 'Exemplo Securitizadora S.A.',
@@ -33,9 +33,9 @@ def inicializar_session_state():
             'op_data_emissao': datetime.date(2024, 1, 15),
             'op_data_vencimento': datetime.date(2034, 1, 15),
             'op_data_lancamento_projeto': datetime.date(2023, 6, 1),
+            
             # Pilar 1
             'hist_emissor': 'Primeira emissão', 'exp_socios': 'Experiência moderada', 'ubo': 'Sim',
-            'hist_socios': 'Primeiro empreendimento ou histórico desconhecido',
             'conselho': 'Consultivo/Sem independência', 'comites': False, 'auditoria': 'Auditoria de Grande Porte (fora do Big Four)',
             'ressalvas': False, 'compliance': 'Em desenvolvimento', 'litigios': 'Baixo impacto financeiro',
             'renegociacao': False, 'midia_negativa': False, 'exp_similar': 'Experiência relevante em segmentos correlatos',
@@ -43,9 +43,9 @@ def inicializar_session_state():
             'analise_credito': 'Apenas análise de renda e garantias', 'modalidade_financeira': 'Análise Corporativa (Holding/Incorporadora)',
             'dl_ebitda': 3.0, 'liq_corrente': 1.2, 'fco_divida': 15.0, 'divida_projeto': 50000000.0, 'vgv_projeto': 100000000.0,
             'custo_remanescente': 30000000.0, 'recursos_obra': 35000000.0, 'vgv_vendido': 60000000.0, 'sd_cri': 50000000.0,
-            'risco_juridico': 'Baixo / Gerenciado',
-            'risco_ambiental': 'Baixo / Gerenciado',
-            'risco_social': 'Baixo / Gerenciado',
+            'risco_juridico': 'Baixo / Gerenciado', 'risco_ambiental': 'Baixo / Gerenciado', 'risco_social': 'Baixo / Gerenciado',
+            'hist_socios': 'Primeiro empreendimento ou histórico desconhecido',
+
             # Pilar 2
             'tipo_lastro': 'Desenvolvimento Imobiliário (Risco de Projeto)', 'segmento_projeto': 'Residencial Vertical',
             'qualidade_municipio': 'Capital / Metrópole', 'microlocalizacao': 'Boa', 'cidade_mapa': 'São Paulo, SP',
@@ -53,22 +53,31 @@ def inicializar_session_state():
             'cronograma': 'Adiantado ou no prazo', 'orcamento': 'Dentro do orçamento', 'fundo_obras': 'Suficiente (100-110%)',
             'saldo_devedor_carteira': 80_000_000.0, 'valor_garantias_carteira': 120_000_000.0, 'ltv_medio_carteira': 66.7,
             'origem': 'Padrão de mercado', 'inadimplencia': 1.2, 'vintage': 'Com leve deterioração', 'concentracao_top5': 6.0,
-            'ivv_calculado': 6.67,
-            'vgv_vendido_perc': 60,
+            'ivv_calculado': 6.67, 'vgv_vendido_perc': 60,
+
             # Pilar 3
             'subordinacao': 10.0, 'waterfall': 'Padrão de mercado com alguma ambiguidade', 'fundo_reserva_pmts': 3.0,
             'fundo_reserva_regra': True, 'sobrecolateralizacao': 110.0, 'spread_excedente': 1.5,
             'tipo_garantia': ['Alienação Fiduciária de Imóveis'], 'ltv_garantia': 60.0, 'liquidez_garantia': 'Média (ex: salas comerciais, loteamentos)',
+            
             # Pilar 4
             'independencia': 'Partes relacionadas com mitigação de conflitos', 'retencao_risco': True,
             'historico_decisoes': 'Decisões mistas, alguns waivers aprovados', 'ag_fiduciario': 'Média, cumpre o papel protocolar',
             'securitizadora': 'Média, com histórico misto', 'servicer': 'Padrão de mercado', 'covenants': 'Padrão, com alguma subjetividade',
             'pareceres': 'Padrão, cumprem requisitos formais', 'relatorios': 'Média, cumprem o mínimo regulatório',
+            
             # Pilar 5
+            'tipo_modelagem_p5': 'Projeto (Desenvolvimento Imobiliário)',
+            'proj_vgv_total': 150000000.0, 'proj_custo_obra': 90000000.0, 'proj_area_total': 10000.0, 'proj_num_unidades': 120,
+            'proj_prazo_obra': 36, 'proj_curva_desembolso': 'Curva \'S\' Simplificada',
+            'proj_ivv_projecao': 5,
+            'cart_sd_total': 100000000.0, 'cart_taxa_media': 12.0, 'cart_amortizacao': 'Price', 'cart_prazo_medio': 180,
+            'cart_perc_balao': 0, 'cart_ltv_medio': 65.0,
             'saldo_lastro_p5': 100000000.0, 'saldo_cri_p5': 80000000.0, 'taxa_lastro_p5': 12.0, 'taxa_cri_p5': 10.0,
             'prazo_p5': 60, 'despesas_p5': 10000.0, 'inad_base': 2.0, 'prep_base': 10.0, 'sev_base': 30, 'lag_base': 12,
             'inad_mod': 5.0, 'prep_mod': 5.0, 'sev_mod': 50, 'lag_mod': 18, 'inad_sev': 10.0, 'prep_sev': 2.0, 'sev_sev': 70,
             'lag_sev': 24,
+            
             # Resultado Final
             'ajuste_final': 0, 'rating_subordinada': 'Não Avaliado', 'justificativa_final': ''
         }
@@ -129,6 +138,7 @@ def ajustar_rating(rating_base, notches):
 # ==============================================================================
 def calcular_score_governanca():
     scores = []
+    # Dicionários de mapeamento
     map_ubo = {"Sim": 1, "Parcialmente": 3, "Não": 5}
     map_conselho = {"Independente e atuante": 1, "Majoritariamente independente": 2, "Consultivo/Sem independência": 4, "Inexistente": 5}
     map_auditoria = {"Big Four": 1, "Auditoria de Grande Porte (fora do Big Four)": 2, "Auditoria de Pequeno Porte/Contador": 4, "Não auditado": 5}
@@ -137,6 +147,8 @@ def calcular_score_governanca():
     map_emissor = {"Emissor recorrente com bom histórico": 1, "Poucas emissões ou histórico misto": 3, "Primeira emissão": 4, "Histórico negativo": 5}
     map_socios = {"Altamente experiente e com boa reputação": 1, "Experiência moderada": 3, "Inexperiente ou com reputação questionável": 5}
     map_risco = {"Baixo / Gerenciado": 1, "Moderado / Pontos de Atenção": 3, "Alto / Risco Relevante": 5}
+
+    # Adição dos scores à lista
     scores.append(map_ubo[st.session_state.ubo])
     scores.append(map_conselho[st.session_state.conselho])
     scores.append(1 if st.session_state.comites else 4)
@@ -151,22 +163,36 @@ def calcular_score_governanca():
     scores.append(map_risco[st.session_state.risco_juridico])
     scores.append(map_risco[st.session_state.risco_ambiental])
     scores.append(map_risco[st.session_state.risco_social])
+    
     return sum(scores) / len(scores) if scores else 5
 
 def calcular_score_operacional():
     scores = []
+    # Mapeamentos existentes
     map_track_record = {"Consistente e previsível": 1, "Desvios esporádicos": 3, "Atrasos e estouros recorrentes": 5}
     map_reputacao = {"Positiva, baixo volume de queixas": 1, "Neutra, volume gerenciável": 3, "Negativa, alto volume de queixas sem resolução": 5}
     map_politica_credito = {"Score de crédito, análise de renda (DTI) e garantias": 1, "Apenas análise de renda e garantias": 3, "Análise simplificada ou ad-hoc": 5}
     map_exp_similar = {"Extensa e comprovada no segmento específico": 1, "Experiência relevante em segmentos correlatos": 2, "Experiência limitada ou em outros segmentos": 4, "Iniciante/Nenhuma": 5}
-    map_hist_socios = {"Sócio(s) com múltiplos empreendimentos de sucesso comprovado": 1, "Sócio(s) com algum histórico de sucesso, sem falhas relevantes": 2, "Primeiro empreendimento ou histórico desconhecido": 4, "Sócio(s) com histórico de falências ou recuperações judiciais": 5}
+    
+    # NOVO MAPEAMENTO PARA HISTÓRICO DOS SÓCIOS
+    map_hist_socios = {
+        "Sócio(s) com múltiplos empreendimentos de sucesso comprovado": 1,
+        "Sócio(s) com algum histórico de sucesso, sem falhas relevantes": 2,
+        "Primeiro empreendimento ou histórico desconhecido": 4,
+        "Sócio(s) com histórico de falências ou recuperações judiciais": 5
+    }
+
+    # Adição dos scores à lista
     scores.append(map_track_record[st.session_state.track_record])
     scores.append(map_reputacao[st.session_state.reputacao])
     scores.append(1 if st.session_state.politica_formalizada else 4)
     scores.append(map_politica_credito[st.session_state.analise_credito])
     scores.append(map_exp_similar[st.session_state.exp_similar])
+    # ADIÇÃO DO NOVO SCORE
     scores.append(map_hist_socios[st.session_state.hist_socios])
+    
     return sum(scores) / len(scores) if scores else 5
+
 
 def calcular_score_financeiro():
     if st.session_state.modalidade_financeira == 'Análise Corporativa (Holding/Incorporadora)':
@@ -275,6 +301,7 @@ def calcular_score_lastro_carteira():
     return score_final
 
 def calcular_score_estrutura():
+    # --- Fator Estrutura de Capital (sem alterações) ---
     scores_capital = []
     subordinacao = st.session_state.subordinacao
     if subordinacao > 20: scores_capital.append(1)
@@ -285,6 +312,8 @@ def calcular_score_estrutura():
     map_waterfall = {"Clara, protetiva e bem definida": 1, "Padrão de mercado com alguma ambiguidade": 3, "Ambígua, com brechas ou prejudicial à série": 5}
     scores_capital.append(map_waterfall[st.session_state.waterfall])
     score_capital = sum(scores_capital) / len(scores_capital)
+
+    # --- Fator Mecanismos de Reforço (sem alterações) ---
     scores_reforco = []
     fundo_reserva_pmts = st.session_state.fundo_reserva_pmts
     if fundo_reserva_pmts > 3: score_fundo = 1
@@ -306,26 +335,46 @@ def calcular_score_estrutura():
     elif spread > 0: scores_reforco.append(4)
     else: scores_reforco.append(5)
     score_reforco = sum(scores_reforco) / len(scores_reforco)
+
+    # --- Fator Qualidade das Garantias (COM A NOVA LÓGICA) ---
     scores_garantias = []
-    map_tipo_garantia = {"Alienação Fiduciária de Imóveis": 1, "Cessão Fiduciária de Recebíveis": 2, "Fiança ou Aval": 4, "Sem garantia real (Fidejussória)": 5}
+    # 1. Nova lógica para o TIPO de garantia (multiselect)
+    map_tipo_garantia = {
+        "Alienação Fiduciária de Imóveis": 1,
+        "Cessão Fiduciária de Recebíveis": 2,
+        "Fiança ou Aval": 4,
+        "Sem garantia real (Fidejussória)": 5
+    }
     garantias_selecionadas = st.session_state.tipo_garantia
+    
     if not garantias_selecionadas:
         score_tipo = 5  # Risco máximo se nenhuma garantia for selecionada
     else:
+        # Pega a pontuação da melhor garantia selecionada como base
         scores_das_selecionadas = [map_tipo_garantia[g] for g in garantias_selecionadas]
         score_base = min(scores_das_selecionadas)
+        
+        # Aplica um bônus (redução de 0.5 na nota) para cada garantia ADICIONAL
         bonus = (len(garantias_selecionadas) - 1) * 0.5
-        score_tipo = max(1, score_base - bonus) # Garante que a nota não seja menor que 1   
+        score_tipo = max(1, score_base - bonus) # Garante que a nota não seja menor que 1
+        
     scores_garantias.append(score_tipo)
+
+    # 2. Lógica para LTV (sem alterações)
     ltv = st.session_state.ltv_garantia
     if ltv < 50: scores_garantias.append(1)
     elif ltv <= 60: scores_garantias.append(2)
     elif ltv <= 70: scores_garantias.append(3)
     elif ltv <= 80: scores_garantias.append(4)
     else: scores_garantias.append(5)
+
+    # 3. Lógica para Liquidez (sem alterações)
     map_liquidez_garantia = {"Alta (ex: aptos residenciais em capital)": 1, "Média (ex: salas comerciais, loteamentos)": 3, "Baixa (ex: imóvel de uso específico, rural)": 5}
     scores_garantias.append(map_liquidez_garantia[st.session_state.liquidez_garantia])
+    
     score_garantias = sum(scores_garantias) / len(scores_garantias)
+
+    # --- Cálculo Final do Pilar 3 (sem alterações) ---
     score_final = (score_capital * 0.40) + (score_reforco * 0.30) + (score_garantias * 0.30)
     return score_final
 
@@ -358,23 +407,23 @@ def run_cashflow_simulation(cenario_premissas, saldo_lastro, saldo_cri_p5, taxa_
 
     saldo_lastro_sim = saldo_lastro
     saldo_cri_sim = saldo_cri_p5
-
+    
     historico = []
     defaults_pendentes = {}
 
-    for mes in range(1, prazo + 1):
+    for mes in range(1, int(prazo) + 1):
         if saldo_lastro_sim < 1 or saldo_cri_sim < 1: break
 
         juros_recebido = saldo_lastro_sim * taxa_juros_lastro_am
-
+        
         prazo_rem = prazo - mes + 1
         amortizacao_programada_lastro = npf.ppmt(taxa_juros_lastro_am, 1, prazo_rem, -saldo_lastro_sim) if taxa_juros_lastro_am > 0 else (saldo_lastro_sim / prazo_rem if prazo_rem > 0 else 0)
-
+        
         novos_defaults = saldo_lastro_sim * taxa_inadimplencia_am
         defaults_pendentes[mes] = novos_defaults
-
+        
         prepagamentos = (saldo_lastro_sim - novos_defaults) * taxa_prepagamento_am
-
+        
         recuperacao_do_mes = 0
         mes_recuperacao = mes - lag_recuperacao
         if mes_recuperacao in defaults_pendentes:
@@ -383,22 +432,22 @@ def run_cashflow_simulation(cenario_premissas, saldo_lastro, saldo_cri_p5, taxa_
 
         caixa_disponivel = juros_recebido + amortizacao_programada_lastro + prepagamentos + recuperacao_do_mes
         caixa_disponivel -= despesas
-
+        
         juros_devido_cri = saldo_cri_sim * taxa_remuneracao_cri_am
         juros_pago_cri = min(juros_devido_cri, caixa_disponivel)
         caixa_disponivel -= juros_pago_cri
-
+        
         amortizacao_paga_cri = min(caixa_disponivel, saldo_cri_sim)
-
+        
         saldo_lastro_sim -= (amortizacao_programada_lastro + prepagamentos + novos_defaults)
         saldo_cri_anterior = saldo_cri_sim
         saldo_cri_sim -= amortizacao_paga_cri
-
+        
         amortizacao_programada_cri = npf.ppmt(taxa_remuneracao_cri_am, 1, prazo_rem, -saldo_cri_anterior) if taxa_remuneracao_cri_am > 0 else (saldo_cri_anterior / prazo_rem if prazo_rem > 0 else 0)
         servico_divida_programado = juros_devido_cri + amortizacao_programada_cri
-
+        
         dscr = (juros_pago_cri + amortizacao_paga_cri) / servico_divida_programado if servico_divida_programado > 0 else 1.0
-
+        
         historico.append({'Mês': mes, 'Saldo Devedor Lastro': saldo_lastro_sim, 'Saldo Devedor CRI': saldo_cri_sim, 'DSCR': dscr})
 
     perda_principal = max(0, saldo_cri_sim)
@@ -415,7 +464,7 @@ inicializar_session_state()
 
 tab0, tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📝 Cadastro da Operação", "Pilar 1: Originador", "Pilar 2: Lastro", "Pilar 3: Estrutura",
-    "Pilar 4: Governança", "Pilar 5: Estresse", "Resultado Final"
+    "Pilar 4: Governança", "📊 Pilar 5: Modelagem e Estresse", "Resultado Final"
 ])
 
 with tab0:
@@ -447,7 +496,6 @@ with tab0:
         st.text_input("Originador/Cedente:", key='op_originador', help="A empresa que originou os créditos (ex: a construtora).")
         st.text_input("Agente Fiduciário:", key='op_agente_fiduciario', help="Representante legal dos investidores (os titulares dos CRIs).")
 
-
 with tab1:
     st.header("Pilar 1: Análise do Risco do Originador/Devedor")
     st.markdown("Peso no Scorecard Mestre: **20%**")
@@ -467,15 +515,15 @@ with tab1:
             st.selectbox("Nível de litígios relevantes (cíveis, fiscais, ambientais):", ["Inexistente ou irrelevante", "Baixo impacto financeiro", "Médio impacto potencial", "Alto impacto / Risco para a operação"], key='litigios', help="Processos relevantes podem indicar passivos ocultos.")
             st.checkbox("Possui comitê de auditoria e/ou riscos formalizado?", key='comites', help="Comitês especializados são um sinal de governança madura.")
             st.checkbox("Identificado envolvimento em notícias negativas de grande impacto ou investigações?", key='midia_negativa', help="Marcado indica alto risco reputacional.")
+            
             st.markdown("---") # Adiciona um separador visual
             st.markdown("**Checkpoints de Risco Específico**")
-
             opcoes_risco = ["Baixo / Gerenciado", "Moderado / Pontos de Atenção", "Alto / Risco Relevante"]
-
             st.selectbox("Risco Jurídico/Regulatório:", opcoes_risco, key='risco_juridico', help="Avalia a exposição a litígios relevantes, ações regulatórias, ou complexidade tributária que possam gerar passivos ocultos para o originador.")
             st.selectbox("Risco Ambiental:", opcoes_risco, key='risco_ambiental', help="Avalia riscos ligados a licenciamento ambiental, contaminação de solo, ou impacto em áreas protegidas, conforme Tabela 1 da metodologia.")
             st.selectbox("Risco Social/Trabalhista:", opcoes_risco, key='risco_social', help="Avalia a exposição a passivos trabalhistas significativos, problemas com a comunidade local ou outras questões de impacto social.")
-            
+
+
     with st.expander("Fator 2: Histórico Operacional (Peso: 30%)"):
         c1, c2 = st.columns(2)
         with c1:
@@ -495,7 +543,7 @@ with tab1:
             with c1: st.number_input("Dívida Líquida / EBITDA", key='dl_ebitda', help="Mede a alavancagem. Idealmente abaixo de 3.0x para o setor.")
             with c2: st.number_input("Liquidez Corrente", key='liq_corrente', help="Mede a capacidade de pagar dívidas de curto prazo. Idealmente acima de 1.2.")
             with c3: st.number_input("FCO / Dívida Total (%)", key='fco_divida', help="Capacidade de pagar a dívida com o caixa gerado. Idealmente acima de 15-20%.")
-
+            
             st.markdown("##### Visualização dos Indicadores Corporativos")
             df_chart = pd.DataFrame({"Valor": [st.session_state.dl_ebitda, st.session_state.liq_corrente], "Benchmark Ruim": [5.0, 0.8], "Benchmark Bom": [2.0, 1.5]}, index=["Dívida/EBITDA", "Liq. Corrente"])
             st.bar_chart(df_chart)
@@ -523,7 +571,7 @@ with tab1:
     if st.button("Calcular Score do Pilar 1", use_container_width=True):
         score_final_pilar1 = (calcular_score_governanca() * 0.30) + (calcular_score_operacional() * 0.30) + (calcular_score_financeiro() * 0.40)
         st.session_state.scores['pilar1'] = score_final_pilar1
-
+        
         st.plotly_chart(create_gauge_chart(score_final_pilar1, "Score Final Ponderado (Pilar 1)"), use_container_width=True)
         with st.expander("Entenda o Cálculo do Score"):
             st.markdown("O Score Final deste pilar é uma média ponderada dos scores dos três fatores, com pesos baseados na Tabela 2 da metodologia:")
@@ -546,7 +594,7 @@ with tab2:
             with c2:
                 st.selectbox("Qualidade da Microlocalização:", ["Nobre / Premium", "Boa", "Regular", "Periférica / Risco"], key='microlocalizacao', help="A qualidade do bairro e entorno imediato é crucial para a valorização e velocidade de vendas.")
                 st.text_input("Cidade/Estado para Mapa:", key='cidade_mapa', help="Ex: 'Rio de Janeiro, RJ'. Usado para gerar o mapa de localização.")
-
+        
         with st.expander("Fator 2: Performance Comercial (Peso: 40%)"):
             c1, c2, c3 = st.columns(3)
             with c1:
@@ -557,7 +605,7 @@ with tab2:
                 unid_ofertadas = st.session_state.unidades_ofertadas_inicio_mes
                 ivv_calculado = (st.session_state.unidades_vendidas_mes / unid_ofertadas) * 100 if unid_ofertadas > 0 else 0
                 st.metric("IVV Calculado", f"{ivv_calculado:.2f}%")
-
+            
             st.slider("Percentual do VGV total já vendido (%)", 0, 100, key='vgv_vendido_perc', help="Percentual de vendas já contratadas. Quanto maior, menor o risco comercial futuro.")
 
         with st.expander("Fator 3: Risco de Execução (Peso: 35%)"):
@@ -575,7 +623,7 @@ with tab2:
                 st.markdown("O Score Final é uma média ponderada dos fatores, com pesos baseados na Tabela 5 (Projeto) da metodologia:")
                 st.latex(r'''Score_{P2} = (Score_{Viab.} \times 0.25) + (Score_{Comercial} \times 0.40) + (Score_{Exec.} \times 0.35)''')
             st.success("Cálculo do Pilar 2 concluído e salvo!")
-
+        
         st.markdown("---")
         st.subheader("Painel de Indicadores-Chave (Projeto)")
         kpi1, kpi2, kpi3 = st.columns(3)
@@ -631,7 +679,10 @@ with tab3:
         st.number_input("Índice de Sobrecolateralização (%)", key='sobrecolateralizacao', help="Ex: 110 para 110%. Ocorre quando o valor do lastro é maior que o da dívida, criando um reforço.")
         st.number_input("Spread Excedente anualizado (%)", key='spread_excedente', help="Diferença positiva entre a taxa do lastro e o custo do CRI. Pode ser usado para cobrir primeiras perdas.")
     with st.expander("Fator 3: Qualidade das Garantias (Peso: 30%)"):
-        st.multiselect("Selecione todos os tipos de garantia presentes na estrutura:", options=["Alienação Fiduciária de Imóveis", "Cessão Fiduciária de Recebíveis", "Fiança ou Aval", "Sem garantia real (Fidejussória)"], key='tipo_garantia', help="Selecione uma ou mais garantias. A combinação de múltiplas garantias robustas melhora a qualidade de crédito da operação.")
+        st.multiselect("Selecione todos os tipos de garantia presentes na estrutura:",
+               options=["Alienação Fiduciária de Imóveis", "Cessão Fiduciária de Recebíveis", "Fiança ou Aval", "Sem garantia real (Fidejussória)"],
+               key='tipo_garantia',
+               help="Selecione uma ou mais garantias. A combinação de múltiplas garantias robustas melhora a qualidade de crédito da operação.")
         st.number_input("LTV Médio Ponderado das garantias (%)", key='ltv_garantia', help="Loan-to-Value da garantia física. < 60% é considerado forte.")
         st.selectbox("Liquidez estimada da garantia", ["Alta (ex: aptos residenciais em capital)", "Média (ex: salas comerciais, loteamentos)", "Baixa (ex: imóvel de uso específico, rural)"], key='liquidez_garantia', help="Facilidade de transformar a garantia em caixa num cenário de execução.")
 
@@ -673,9 +724,100 @@ with tab4:
         st.success("Cálculo do Pilar 4 concluído e salvo!")
 
 with tab5:
-    st.header("Pilar 5: Modelagem de Fluxo de Caixa e Testes de Estresse")
-    st.markdown("Esta etapa representa a validação quantitativa da resiliência da operação.")
+    st.header("📊 Pilar 5: Modelagem Financeira e Teste de Estresse")
+    st.markdown("Esta seção é o motor quantitativo da análise. Modele o fluxo de caixa do lastro para, em seguida, validar a resiliência da estrutura através de testes de estresse.")
 
+    # Passo 1: Seletor do Tipo de Modelagem
+    tipo_modelagem = st.radio(
+        "Selecione a natureza do lastro para modelagem:",
+        ('Projeto (Desenvolvimento Imobiliário)', 'Carteira de Recebíveis (Crédito Pulverizado)'),
+        key="tipo_modelagem_p5",
+        horizontal=True
+    )
+    st.divider()
+
+    # ==============================================================================
+    # MODELAGEM PARA PROJETO (DESENVOLVIMENTO IMOBILIÁRIO)
+    # ==============================================================================
+    if tipo_modelagem == 'Projeto (Desenvolvimento Imobiliário)':
+        st.subheader("Módulo de Modelagem: Risco de Projeto")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            with st.expander("Parâmetros Gerais do Empreendimento", expanded=True):
+                st.number_input("VGV Total do Projeto (R$)", key="proj_vgv_total")
+                st.number_input("Custo Total da Obra (R$)", key="proj_custo_obra")
+                st.number_input("Área Total Construída (m²)", key="proj_area_total")
+                st.number_input("Número Total de Unidades", key="proj_num_unidades", step=1)
+                
+                # Indicadores calculados
+                custo_por_m2 = st.session_state.proj_custo_obra / st.session_state.proj_area_total if st.session_state.proj_area_total else 0
+                custo_sobre_vgv = (st.session_state.proj_custo_obra / st.session_state.proj_vgv_total) * 100 if st.session_state.proj_vgv_total else 0
+                st.metric("Custo de Obra / m²", f"R$ {custo_por_m2:,.2f}")
+                st.metric("Custo de Obra / VGV", f"{custo_sobre_vgv:.2f}%")
+
+        with col2:
+            with st.expander("Cronograma e Desembolso da Obra", expanded=True):
+                st.number_input("Prazo da Obra (meses)", key="proj_prazo_obra", step=1)
+                st.selectbox("Curva de Desembolso da Obra", ["Linear", "Curva 'S' Simplificada"], key="proj_curva_desembolso")
+                st.info("Aqui poderíamos ter uma tabela para uma curva de desembolso customizada.", icon="ℹ️")
+
+        with st.expander("Bolsão de Unidades e Status de Vendas", expanded=True):
+            st.markdown("Insira o detalhamento das unidades do empreendimento.")
+            # Usamos o data_editor para uma interface de planilha
+            df_unidades = pd.DataFrame([
+                {"Tipo": "Apto 2Q", "Nº Unidades": 50, "Área m²": 60, "Preço/m²": 8000, "Status": "Estoque"},
+                {"Tipo": "Apto 3Q", "Nº Unidades": 30, "Área m²": 85, "Preço/m²": 8500, "Status": "Vendido"},
+                {"Tipo": "Cobertura", "Nº Unidades": 4, "Área m²": 150, "Preço/m²": 9500, "Status": "Permuta"},
+            ])
+            st.data_editor(df_unidades, key="proj_df_unidades", num_rows="dynamic")
+
+        with st.expander("Projeção de Comercialização (Velocidade de Vendas)", expanded=True):
+            st.slider("Velocidade de Vendas projetada (% do estoque/mês)", 0, 100, 5, key="proj_ivv_projecao", help="Índice de Velocidade de Vendas esperado para o estoque remanescente.")
+        
+        st.divider()
+        st.subheader("Resultados da Modelagem do Projeto")
+        # AQUI ENTRARIA A LÓGICA DE CÁLCULO E OS GRÁFICOS
+        st.info("Neste espaço, seriam exibidos os gráficos de Fluxo de Caixa da Operação (Recebíveis vs. Obrigações), a evolução do saldo devedor do CRI e outros indicadores-chave.", icon="📈")
+        # Exemplo de como poderia ser:
+        # fluxo_de_caixa_df = gerar_fluxo_projeto(st.session_state)
+        # st.line_chart(fluxo_de_caixa_df[['Receita de Vendas', 'Desembolso Total']])
+
+    # ==============================================================================
+    # MODELAGEM PARA CARTEIRA DE RECEBÍVEIS
+    # ==============================================================================
+    elif tipo_modelagem == 'Carteira de Recebíveis (Crédito Pulverizado)':
+        st.subheader("Módulo de Modelagem: Risco de Crédito")
+        
+        with st.expander("Características Gerais da Carteira", expanded=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.number_input("Saldo Devedor Atual da Carteira (R$)", key="cart_sd_total")
+                st.number_input("Taxa de Juros Média Ponderada (% a.a.)", key="cart_taxa_media")
+                st.selectbox("Sistema de Amortização Predominante", ["SAC", "Price", "Gradiente"], key="cart_amortizacao")
+            with col2:
+                st.number_input("Prazo Remanescente Médio (meses)", key="cart_prazo_medio", step=1)
+                st.slider("Percentual do Saldo com Pagamento 'Balão' (%)", 0, 100, 0, key="cart_perc_balao")
+                st.number_input("LTV Médio Ponderado dos Clientes (%)", key="cart_ltv_medio")
+        
+        with st.expander("Estratificação e Histórico da Carteira", expanded=True):
+             st.info("Esta seção pode ser expandida para incluir uma análise de 'vintages' (safras), com taxas de inadimplência e pré-pagamento históricas para fundamentar as premissas do modelo.", icon="ℹ️")
+
+        st.divider()
+        st.subheader("Resultados da Modelagem da Carteira")
+        # AQUI ENTRARIA A LÓGICA DE CÁLCULO E OS GRÁFICOS
+        st.info("Neste espaço, seriam exibidos os gráficos com a projeção de amortização, juros, inadimplência e pré-pagamentos, e o fluxo de caixa líquido para o CRI.", icon="📈")
+        # Exemplo de como poderia ser:
+        # fluxo_de_caixa_df = gerar_fluxo_carteira(st.session_state)
+        # st.area_chart(fluxo_de_caixa_df[['Juros Recebidos', 'Amortização Recebida']])
+
+    # ==============================================================================
+    # SEÇÃO DE TESTE DE ESTRESSE (EXISTENTE)
+    # ==============================================================================
+    st.divider()
+    st.subheader("Validação da Estrutura: Teste de Estresse")
+    st.markdown("Após modelar o cenário base, utilize esta seção para estressar as premissas e testar a resiliência dos mecanismos de proteção de crédito da estrutura.")
+    
     with st.expander("Inputs do Modelo (Dados da Operação)", expanded=True):
         c1, c2, c3 = st.columns(3)
         with c1:
@@ -685,7 +827,7 @@ with tab5:
             st.number_input("Taxa Média do Lastro (% a.a.)", key='taxa_lastro_p5')
             st.number_input("Taxa da Série Sênior (% a.a.)", key='taxa_cri_p5')
         with c3:
-            st.number_input("Prazo Remanescente (meses)", key='prazo_p5', step=1, format="%d")
+            st.number_input("Prazo Remanescente (meses)", key='prazo_p5', step=1)
             st.number_input("Despesas Fixas Mensais (R$)", key='despesas_p5')
 
     st.markdown("---")
@@ -704,56 +846,31 @@ with tab5:
 
     st.markdown("---")
     if st.button("Executar Simulação de Fluxo de Caixa", use_container_width=True):
-
+        
         with st.spinner("Simulando cenários... Por favor, aguarde."):
             perda_base, df_base = run_cashflow_simulation(cenarios['base'], st.session_state.saldo_lastro_p5, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro_p5, st.session_state.taxa_cri_p5, st.session_state.prazo_p5, st.session_state.despesas_p5)
             perda_mod, df_mod = run_cashflow_simulation(cenarios['moderado'], st.session_state.saldo_lastro_p5, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro_p5, st.session_state.taxa_cri_p5, st.session_state.prazo_p5, st.session_state.despesas_p5)
             perda_sev, df_sev = run_cashflow_simulation(cenarios['severo'], st.session_state.saldo_lastro_p5, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro_p5, st.session_state.taxa_cri_p5, st.session_state.prazo_p5, st.session_state.despesas_p5)
             st.session_state.resultados_pilar5 = {'perda_base': perda_base, 'perda_moderado': perda_mod, 'perda_severo': perda_sev}
-
+        
         st.subheader("Resultados da Simulação")
         rc1, rc2, rc3 = st.columns(3)
         rc1.metric("Perda de Principal (Base)", f"R$ {st.session_state.resultados_pilar5['perda_base']:,.2f}")
         rc2.metric("Perda de Principal (Moderado)", f"R$ {st.session_state.resultados_pilar5['perda_moderado']:,.2f}")
         rc3.metric("Perda de Principal (Severo)", f"R$ {st.session_state.resultados_pilar5['perda_severo']:,.2f}")
-
+        
         st.markdown("---")
         st.subheader("Gráficos de Performance")
-
-        # Cria o DataFrame com os resultados do DSCR
-        df_dscr = pd.DataFrame({
-            'Base': df_base.set_index('Mês')['DSCR'],
-            'Moderado': df_mod.set_index('Mês')['DSCR'],
-            'Severo': df_sev.set_index('Mês')['DSCR']
-        })
-
-        # Cria uma figura Plotly para o DSCR
+        
+        df_dscr = pd.DataFrame({'Base': df_base.set_index('Mês')['DSCR'],'Moderado': df_mod.set_index('Mês')['DSCR'],'Severo': df_sev.set_index('Mês')['DSCR']})
         fig_dscr = go.Figure()
-
-        # Adiciona uma linha para cada cenário
         for cenario in df_dscr.columns:
-            fig_dscr.add_trace(go.Scatter(x=df_dscr.index, y=df_dscr[cenario],
-                                          mode='lines',
-                                          name=cenario))
-
-        # Adiciona a linha de referência horizontal em y=1.0
-        fig_dscr.add_hline(y=1.0, line_dash="dot", line_color="red",
-                           annotation_text="DSCR = 1.0x",
-                           annotation_position="bottom right")
-
-        # Atualiza o layout do gráfico
-        fig_dscr.update_layout(
-            title="DSCR (Cobertura do Serviço da Dívida) por Cenário",
-            xaxis_title="Mês da Operação",
-            yaxis_title="Índice DSCR",
-            legend_title="Cenários"
-        )
-
-        # Exibe o gráfico Plotly no Streamlit
+            fig_dscr.add_trace(go.Scatter(x=df_dscr.index, y=df_dscr[cenario], mode='lines', name=cenario))
+        fig_dscr.add_hline(y=1.0, line_dash="dot", line_color="red", annotation_text="DSCR = 1.0x", annotation_position="bottom right")
+        fig_dscr.update_layout(title="DSCR (Cobertura do Serviço da Dívida) por Cenário", xaxis_title="Mês da Operação", yaxis_title="Índice DSCR", legend_title="Cenários")
         st.plotly_chart(fig_dscr, use_container_width=True)
         st.caption("Gráfico 1: Análise da capacidade de pagamento da operação. Valores abaixo de 1.0x indicam insuficiência de caixa para cobrir o serviço da dívida.")
-
-        # O restante do código do Gráfico 2 permanece o mesmo
+        
         df_saldos = pd.DataFrame({'Lastro (Base)': df_base.set_index('Mês')['Saldo Devedor Lastro'],'CRI (Base)': df_base.set_index('Mês')['Saldo Devedor CRI'],'Lastro (Severo)': df_sev.set_index('Mês')['Saldo Devedor Lastro'],'CRI (Severo)': df_sev.set_index('Mês')['Saldo Devedor CRI'],})
         st.area_chart(df_saldos, use_container_width=True)
         st.caption("Gráfico 2: Amortização dos Saldos Devedores do Lastro vs. CRI.")
@@ -761,13 +878,15 @@ with tab5:
 
 with tab6:
     st.header("Resultado Final e Atribuição de Rating")
-    if len(st.session_state.scores) < 4 or st.session_state.resultados_pilar5 is None:
-        st.warning("Por favor, calcule todos os 4 pilares de score e execute a simulação do Pilar 5 antes de prosseguir.")
+    if len(st.session_state.scores) < 4:
+        st.warning("Por favor, calcule todos os 4 pilares de score antes de prosseguir para o resultado final.")
+    elif st.session_state.resultados_pilar5 is None:
+        st.warning("Por favor, execute a simulação de Fluxo de Caixa no Pilar 5 antes de prosseguir.")
     else:
-        pesos = {'pilar1': 0.20, 'pilar2': 0.30, 'pilar3': 0.30, 'pilar4': 0.20}
+        pesos = {'pilar1': 0.20, 'pilar2': 0.30, 'pilar3': 0.30, 'picar4': 0.20}
         score_final_ponderado = sum(st.session_state.scores.get(p, 5) * pesos[p] for p in pesos)
         rating_indicado = converter_score_para_rating(score_final_ponderado)
-
+        
         st.subheader("Scorecard Mestre")
         data = {
             'Componente': ['Pilar 1: Originador/Devedor','Pilar 2: Lastro','Pilar 3: Estrutura e Reforços','Pilar 4: Jurídico/Governança'],
@@ -777,12 +896,12 @@ with tab6:
         }
         df_scores = pd.DataFrame(data).set_index('Componente')
         st.table(df_scores)
-
+        
         c1, c2 = st.columns(2)
         c1.metric(label="Score Final Ponderado", value=f"{score_final_ponderado:.2f}")
         c2.metric(label="Rating Indicado pelo Score", value=rating_indicado)
         st.markdown("---")
-
+        
         st.subheader("Validação Quantitativa (Pilar 5)")
         perdas = st.session_state.resultados_pilar5
         perda_moderado = perdas['perda_moderado']
@@ -795,7 +914,7 @@ with tab6:
             st.info("ℹ️ A estrutura suportou o Cenário Severo sem perdas de principal.")
         else:
             st.warning(f"⚠️ A estrutura apresentou perda de R$ {perda_severo:,.2f} no Cenário Severo.")
-
+        
         st.markdown("---")
         st.subheader("Deliberação Final do Comitê de Rating")
         col1, col2 = st.columns([1,2])
