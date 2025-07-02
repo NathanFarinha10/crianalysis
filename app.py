@@ -20,7 +20,7 @@ def inicializar_session_state():
 
         defaults = {
             # Pilar 1
-            'hist_emissor': 'Primeira emissão ou histórico negativo', 'exp_socios': 'Experiência moderada', 'ubo': 'Sim',
+            'hist_emissor': 'Primeira emissão', 'exp_socios': 'Experiência moderada', 'ubo': 'Sim',
             'conselho': 'Consultivo/Sem independência', 'comites': False, 'auditoria': 'Outra auditoria de mercado',
             'ressalvas': False, 'compliance': 'Em desenvolvimento', 'litigios': 'Baixo impacto financeiro',
             'renegociacao': False, 'midia_negativa': False, 'exp_similar': 'Experiência relevante em segmentos correlatos',
@@ -112,7 +112,7 @@ def ajustar_rating(rating_base, notches):
 def calcular_score_governanca():
     scores = []; map_ubo = {"Sim": 1, "Parcialmente": 3, "Não": 5}; map_conselho = {"Independente e atuante": 1, "Majoritariamente independente": 2, "Consultivo/Sem independência": 4, "Inexistente": 5}
     map_auditoria = {"Big Four": 1, "Outra auditoria de mercado": 2, "Não auditado": 5}; map_compliance = {"Maduras e implementadas": 1, "Em desenvolvimento": 3, "Inexistentes ou ad-hoc": 5}
-    map_litigios = {"Inexistente ou irrelevante": 1, "Baixo impacto financeiro": 2, "Médio impacto potencial": 4, "Alto impacto / Risco para a operação": 5}; map_emissor = {"Emissor recorrente com bom histórico": 1, "Poucas emissões ou histórico misto": 3, "Primeira emissão ou histórico negativo": 4}
+    map_litigios = {"Inexistente ou irrelevante": 1, "Baixo impacto financeiro": 2, "Médio impacto potencial": 4, "Alto impacto / Risco para a operação": 5}; map_emissor = {"Emissor recorrente com bom histórico": 1, "Poucas emissões ou histórico misto": 3, "Primeira emissão": 4, "Histórico negativo": 5}
     map_socios = {"Altamente experiente e com boa reputação": 1, "Experiência moderada": 3, "Inexperiente ou com reputação questionável": 5}
     scores.append(map_ubo[st.session_state.ubo]); scores.append(map_conselho[st.session_state.conselho]); scores.append(1 if st.session_state.comites else 4); scores.append(map_auditoria[st.session_state.auditoria])
     scores.append(5 if st.session_state.ressalvas else 1); scores.append(map_compliance[st.session_state.compliance]); scores.append(map_litigios[st.session_state.litigios]); scores.append(5 if st.session_state.renegociacao else 1)
@@ -368,7 +368,7 @@ with tab1:
     with st.expander("Fator 1: Governança e Reputação (Peso: 30%)", expanded=True):
         c1, c2 = st.columns(2)
         with c1:
-            st.selectbox("Histórico de emissões no mercado de capitais:", ["Emissor recorrente com bom histórico", "Poucas emissões ou histórico misto", "Primeira emissão ou histórico negativo"], key='hist_emissor', help="Avalia a maturidade e governança da empresa ao acessar o mercado.")
+            st.selectbox("Histórico de emissões no mercado de capitais:", ["Emissor recorrente com bom histórico", "Poucas emissões ou histórico misto", "Primeira emissão", "Histórico negativo"], key='hist_emissor', help="Avalia a maturidade e governança da empresa ao acessar o mercado.")
             st.radio("Os beneficiários finais (UBOs) estão claramente identificados?", ["Sim", "Parcialmente", "Não"], key='ubo', help="Transparência na estrutura societária. Nota 1 para 'Sim', 5 para 'Não'.")
             st.selectbox("Maturidade das políticas de compliance e risco:", ["Maduras e implementadas", "Em desenvolvimento", "Inexistentes ou ad-hoc"], key='compliance', help="Políticas robustas e testadas reduzem o risco operacional e legal.")
             st.checkbox("Houve ressalvas relevantes na última auditoria?", key='ressalvas', help="Marcado significa que houve ressalvas, o que aumenta o risco.")
