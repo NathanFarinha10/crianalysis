@@ -169,59 +169,68 @@ def gerar_fluxo_carteira(ss):
 def gerar_fluxo_projeto(ss):
     """
     Gera um fluxo de caixa simplificado para um projeto de desenvolvimento imobiliário.
+    Versão aprimorada com validação de colunas.
     """
     try:
+        # --- VALIDAÇÃO DAS COLUNAS DA TABELA DE UNIDADES ---
+        colunas_necessarias = ['Tipo', 'Nº Unidades', 'Área m²', 'Preço/m²', 'Status']
+        df_unidades = ss.proj_df_unidades
+        
+        colunas_faltantes = [col for col in colunas_necessarias if col not in df_unidades.columns]
+        if colunas_faltantes:
+            st.error(f"Erro de modelagem: A tabela de unidades não contém as colunas necessárias. Colunas faltando: {colunas_faltantes}")
+            return pd.DataFrame() # Retorna um DataFrame vazio para parar a execução
+        # --- FIM DA VALIDAÇÃO ---
+
         # Coleta de inputs do session_state (ss)
         vgv_total = ss.proj_vgv_total
         custo_total_obra = ss.proj_custo_obra
         prazo_obra = int(ss.proj_prazo_obra)
         ivv_projetado = ss.proj_ivv_projecao / 100
         
-        # Dados do CRI (da aba Cadastro)
         divida_total_cri = ss.op_volume
         taxa_cri_aa = ss.op_taxa / 100
         prazo_cri = int(ss.op_prazo)
         taxa_cri_am = (1 + taxa_cri_aa)**(1/12) - 1
 
-        # Lógica simplificada do "Bolsão de Unidades"
-        df_unidades = ss.proj_df_unidades
-        estoque_vgv_inicial = df_unidades[df_unidades['Status'] == 'Estoque']['Nº Unidades'].sum() * \
-                               df_unidades[df_unidades['Status'] == 'Estoque']['Preço/m²'].mean() * \
-                               df_unidades[df_unidades['Status'] == 'Estoque']['Área m²'].mean()
+        # Lógica do "Bolsão de Unidades"
+        # Converte colunas para numérico para evitar erros de cálculo
+        df_unidades['Nº Unidades'] = pd.to_numeric(df_unidades['Nº Unidades'])
+        df_unidades['Preço/m²'] = pd.to_numeric(df_unidades['Preço/m²'])
+        df_unidades['Área m²'] = pd.to_numeric(df_unidades['Área m²'])
 
+        estoque_df = df_unidades[df_unidades['Status'] == 'Estoque']
+        if not estoque_df.empty:
+            preco_medio_estoque = (estoque_df['Preço/m²'] * estoque_df['Área m²'] * estoque_df['Nº Unidades']).sum() / (estoque_df['Área m²'] * estoque_df['Nº Unidades']).sum()
+            estoque_vgv_inicial = (estoque_df['Preço/m²'] * estoque_df['Área m²'] * estoque_df['Nº Unidades']).sum()
+        else:
+            preco_medio_estoque = 0
+            estoque_vgv_inicial = 0
 
         fluxo = []
         saldo_obra_a_desembolsar = custo_total_obra
         estoque_vgv_atual = estoque_vgv_inicial
         saldo_devedor_cri = divida_total_cri
         
-        # Simula por um prazo suficientemente longo
         for mes in range(1, prazo_cri + 1):
-            # 1. Desembolso da Obra (saída de caixa)
             desembolso_obra = 0
             if mes <= prazo_obra and saldo_obra_a_desembolsar > 0:
-                # Curva de desembolso linear para simplificação
                 desembolso_mensal = custo_total_obra / prazo_obra
                 desembolso_obra = min(desembolso_mensal, saldo_obra_a_desembolsar)
                 saldo_obra_a_desembolsar -= desembolso_obra
 
-            # 2. Receita de Vendas (entrada de caixa)
             receita_vendas = 0
             if estoque_vgv_atual > 0:
                 venda_do_mes = estoque_vgv_atual * ivv_projetado
                 receita_vendas = min(venda_do_mes, estoque_vgv_atual)
                 estoque_vgv_atual -= receita_vendas
 
-            # 3. Serviço da Dívida do CRI (saída de caixa)
             juros_cri = saldo_devedor_cri * taxa_cri_am
-            # Amortização Price para simplificação
             pmt_cri = npf.pmt(taxa_cri_am, prazo_cri - mes + 1, -saldo_devedor_cri) if saldo_devedor_cri > 0 else 0
             amortizacao_cri = pmt_cri - juros_cri
             amortizacao_cri = min(amortizacao_cri, saldo_devedor_cri)
             
             obrigacoes_totais = juros_cri + amortizacao_cri
-
-            # 4. Fluxo de Caixa
             caixa_liquido = receita_vendas - desembolso_obra - obrigacoes_totais
             
             fluxo.append({
