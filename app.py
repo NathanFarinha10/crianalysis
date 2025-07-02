@@ -169,18 +169,20 @@ def gerar_fluxo_carteira(ss):
 def gerar_fluxo_projeto(ss):
     """
     Gera um fluxo de caixa simplificado para um projeto de desenvolvimento imobiliário.
-    Versão aprimorada com validação de colunas.
+    Versão aprimorada com validação de colunas e conversão de tipo de dados.
     """
     try:
-        # --- VALIDAÇÃO DAS COLUNAS DA TABELA DE UNIDADES ---
+        # --- GARANTE QUE OS DADOS DA TABELA DE UNIDADES SEJAM UM DATAFRAME ---
+        # Chave da correção: Converte os dados do st.data_editor para um DataFrame
+        df_unidades = pd.DataFrame(ss.proj_df_unidades)
+        # --- FIM DA CORREÇÃO ---
+
+        # Validação das colunas da tabela de unidades
         colunas_necessarias = ['Tipo', 'Nº Unidades', 'Área m²', 'Preço/m²', 'Status']
-        df_unidades = ss.proj_df_unidades
-        
         colunas_faltantes = [col for col in colunas_necessarias if col not in df_unidades.columns]
         if colunas_faltantes:
             st.error(f"Erro de modelagem: A tabela de unidades não contém as colunas necessárias. Colunas faltando: {colunas_faltantes}")
-            return pd.DataFrame() # Retorna um DataFrame vazio para parar a execução
-        # --- FIM DA VALIDAÇÃO ---
+            return pd.DataFrame()
 
         # Coleta de inputs do session_state (ss)
         vgv_total = ss.proj_vgv_total
@@ -194,17 +196,15 @@ def gerar_fluxo_projeto(ss):
         taxa_cri_am = (1 + taxa_cri_aa)**(1/12) - 1
 
         # Lógica do "Bolsão de Unidades"
-        # Converte colunas para numérico para evitar erros de cálculo
         df_unidades['Nº Unidades'] = pd.to_numeric(df_unidades['Nº Unidades'])
         df_unidades['Preço/m²'] = pd.to_numeric(df_unidades['Preço/m²'])
         df_unidades['Área m²'] = pd.to_numeric(df_unidades['Área m²'])
 
         estoque_df = df_unidades[df_unidades['Status'] == 'Estoque']
         if not estoque_df.empty:
-            preco_medio_estoque = (estoque_df['Preço/m²'] * estoque_df['Área m²'] * estoque_df['Nº Unidades']).sum() / (estoque_df['Área m²'] * estoque_df['Nº Unidades']).sum()
-            estoque_vgv_inicial = (estoque_df['Preço/m²'] * estoque_df['Área m²'] * estoque_df['Nº Unidades']).sum()
+            vgv_unidades_estoque = (estoque_df['Preço/m²'] * estoque_df['Área m²'] * estoque_df['Nº Unidades'])
+            estoque_vgv_inicial = vgv_unidades_estoque.sum()
         else:
-            preco_medio_estoque = 0
             estoque_vgv_inicial = 0
 
         fluxo = []
