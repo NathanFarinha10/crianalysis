@@ -169,7 +169,7 @@ def gerar_fluxo_carteira(ss):
 def gerar_fluxo_projeto(ss):
     """
     Gera um fluxo de caixa simplificado para um projeto de desenvolvimento imobiliário.
-    Versão corrigida para lidar com diferentes tipos de dados do st.data_editor.
+    Versão final com tratamento para DataFrame, Lista e Dicionário vindos do st.data_editor.
     """
     try:
         # --- LÓGICA ROBUSTA PARA LIDAR COM OS DADOS DO st.data_editor ---
@@ -179,13 +179,21 @@ def gerar_fluxo_projeto(ss):
         if isinstance(unidades_data, pd.DataFrame):
             # Se os dados já são um DataFrame, apenas os copiamos
             df_unidades = unidades_data.copy()
-            df_unidades.dropna(how='all', inplace=True) # Remove linhas que são totalmente vazias
+            df_unidades.dropna(how='all', inplace=True)
         
         elif isinstance(unidades_data, list):
             # Se for uma lista, limpamos e depois convertemos para DataFrame
             unidades_data_limpa = [d for d in unidades_data if isinstance(d, dict) and d]
             if unidades_data_limpa:
                 df_unidades = pd.DataFrame(unidades_data_limpa)
+        
+        elif isinstance(unidades_data, dict):
+            # NOVO TRATAMENTO: Se for um dicionário, convertemos usando from_dict
+            # Isso acontece quando o data_editor usa os índices como chaves.
+            # O 'orient="index"' trata as chaves do dicionário como as linhas do DataFrame.
+            df_unidades = pd.DataFrame.from_dict(unidades_data, orient='index')
+            df_unidades.dropna(how='all', inplace=True)
+
         else:
             st.error(f"Formato de dados da tabela de unidades não reconhecido: {type(unidades_data)}")
             return pd.DataFrame()
