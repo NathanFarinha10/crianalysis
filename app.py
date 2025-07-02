@@ -113,7 +113,6 @@ def ajustar_rating(rating_base, notches):
 # FUNÇÕES DE CÁLCULO DE SCORE
 # ==============================================================================
 def calcular_score_governanca():
-    def calcular_score_governanca():
     scores = []
     map_ubo = {"Sim": 1, "Parcialmente": 3, "Não": 5}
     map_conselho = {"Independente e atuante": 1, "Majoritariamente independente": 2, "Consultivo/Sem independência": 4, "Inexistente": 5}
