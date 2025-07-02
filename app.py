@@ -169,7 +169,7 @@ def gerar_fluxo_carteira(ss):
 def gerar_fluxo_projeto(ss):
     """
     Gera um fluxo de caixa simplificado para um projeto de desenvolvimento imobiliário.
-    Versão final com tratamento para DataFrame, Lista e Dicionário vindos do st.data_editor.
+    Versão final com tratamento para DataFrame, Lista e Dicionário (de listas) vindos do st.data_editor.
     """
     try:
         # --- LÓGICA ROBUSTA PARA LIDAR COM OS DADOS DO st.data_editor ---
@@ -177,32 +177,32 @@ def gerar_fluxo_projeto(ss):
         df_unidades = pd.DataFrame() # Inicia um DataFrame vazio
 
         if isinstance(unidades_data, pd.DataFrame):
-            # Se os dados já são um DataFrame, apenas os copiamos
             df_unidades = unidades_data.copy()
             df_unidades.dropna(how='all', inplace=True)
         
         elif isinstance(unidades_data, list):
-            # Se for uma lista, limpamos e depois convertemos para DataFrame
             unidades_data_limpa = [d for d in unidades_data if isinstance(d, dict) and d]
             if unidades_data_limpa:
                 df_unidades = pd.DataFrame(unidades_data_limpa)
         
         elif isinstance(unidades_data, dict):
-            # NOVO TRATAMENTO: Se for um dicionário, convertemos usando from_dict
-            # Isso acontece quando o data_editor usa os índices como chaves.
-            # O 'orient="index"' trata as chaves do dicionário como as linhas do DataFrame.
-            df_unidades = pd.DataFrame.from_dict(unidades_data, orient='index')
+            # --- LÓGICA CORRIGIDA para o caso de dicionário ---
+            # Converte os valores do dicionário (que são as linhas) para uma lista
+            lista_de_linhas = list(unidades_data.values())
+            # Define as colunas na ordem esperada
+            colunas = ['Tipo', 'Nº Unidades', 'Área m²', 'Preço/m²', 'Status']
+            # Cria o DataFrame a partir da lista de linhas e nomes de colunas
+            df_unidades = pd.DataFrame(lista_de_linhas, columns=colunas)
             df_unidades.dropna(how='all', inplace=True)
+            # --- FIM DA CORREÇÃO ---
 
         else:
             st.error(f"Formato de dados da tabela de unidades não reconhecido: {type(unidades_data)}")
             return pd.DataFrame()
       
-        # Após o tratamento, verificamos se o DataFrame final está vazio
         if df_unidades.empty:
             st.warning("A tabela de unidades está vazia ou contém apenas linhas em branco. Preencha os dados para modelar.")
             return pd.DataFrame()
-        # --- FIM DA CORREÇÃO ---
 
         # Validação das colunas da tabela de unidades
         colunas_necessarias = ['Tipo', 'Nº Unidades', 'Área m²', 'Preço/m²', 'Status']
