@@ -43,7 +43,7 @@ def inicializar_session_state():
             # Pilar 3
             'subordinacao': 10.0, 'waterfall': 'Padrão de mercado com alguma ambiguidade', 'fundo_reserva_pmts': 3.0,
             'fundo_reserva_regra': True, 'sobrecolateralizacao': 110.0, 'spread_excedente': 1.5,
-            'tipo_garantia': 'Alienação Fiduciária de Imóveis', 'ltv_garantia': 60.0, 'liquidez_garantia': 'Média (ex: salas comerciais, loteamentos)',
+            'tipo_garantia': ['Alienação Fiduciária de Imóveis'], 'ltv_garantia': 60.0, 'liquidez_garantia': 'Média (ex: salas comerciais, loteamentos)',
             # Pilar 4
             'independencia': 'Partes relacionadas com mitigação de conflitos', 'retencao_risco': True,
             'historico_decisoes': 'Decisões mistas, alguns waivers aprovados', 'ag_fiduciario': 'Média, cumpre o papel protocolar',
@@ -252,21 +252,25 @@ def calcular_score_lastro_carteira():
     return score_final
 
 def calcular_score_estrutura():
-    scores_capital = []; subordinacao = st.session_state.subordinacao
+    scores_capital = []
+    subordinacao = st.session_state.subordinacao
     if subordinacao > 20: scores_capital.append(1)
     elif subordinacao >= 15: scores_capital.append(2)
     elif subordinacao >= 10: scores_capital.append(3)
     elif subordinacao >= 5: scores_capital.append(4)
     else: scores_capital.append(5)
     map_waterfall = {"Clara, protetiva e bem definida": 1, "Padrão de mercado com alguma ambiguidade": 3, "Ambígua, com brechas ou prejudicial à série": 5}
-    scores_capital.append(map_waterfall[st.session_state.waterfall]); score_capital = sum(scores_capital) / len(scores_capital)
-    scores_reforco = []; fundo_reserva_pmts = st.session_state.fundo_reserva_pmts
+    scores_capital.append(map_waterfall[st.session_state.waterfall])
+    score_capital = sum(scores_capital) / len(scores_capital)
+    scores_reforco = []
+    fundo_reserva_pmts = st.session_state.fundo_reserva_pmts
     if fundo_reserva_pmts > 3: score_fundo = 1
     elif fundo_reserva_pmts >= 2: score_fundo = 2
     elif fundo_reserva_pmts >= 1: score_fundo = 3
     else: score_fundo = 5
     if not st.session_state.fundo_reserva_regra: score_fundo = min(5, score_fundo + 1)
-    scores_reforco.append(score_fundo); oc = st.session_state.sobrecolateralizacao
+    scores_reforco.append(score_fundo)
+    oc = st.session_state.sobrecolateralizacao
     if oc > 120: scores_reforco.append(1)
     elif oc >= 110: scores_reforco.append(2)
     elif oc >= 105: scores_reforco.append(3)
@@ -279,15 +283,26 @@ def calcular_score_estrutura():
     elif spread > 0: scores_reforco.append(4)
     else: scores_reforco.append(5)
     score_reforco = sum(scores_reforco) / len(scores_reforco)
-    scores_garantias = []; map_tipo_garantia = {"Alienação Fiduciária de Imóveis": 1, "Cessão Fiduciária de Recebíveis": 2, "Fiança ou Aval": 4, "Sem garantia real (Fidejussória)": 5}
-    scores_garantias.append(map_tipo_garantia[st.session_state.tipo_garantia]); ltv = st.session_state.ltv_garantia
+    scores_garantias = []
+    map_tipo_garantia = {"Alienação Fiduciária de Imóveis": 1, "Cessão Fiduciária de Recebíveis": 2, "Fiança ou Aval": 4, "Sem garantia real (Fidejussória)": 5}
+    garantias_selecionadas = st.session_state.tipo_garantia
+    if not garantias_selecionadas:
+        score_tipo = 5  # Risco máximo se nenhuma garantia for selecionada
+    else:
+        scores_das_selecionadas = [map_tipo_garantia[g] for g in garantias_selecionadas]
+        score_base = min(scores_das_selecionadas)
+        bonus = (len(garantias_selecionadas) - 1) * 0.5
+        score_tipo = max(1, score_base - bonus) # Garante que a nota não seja menor que 1   
+    scores_garantias.append(score_tipo)
+    ltv = st.session_state.ltv_garantia
     if ltv < 50: scores_garantias.append(1)
     elif ltv <= 60: scores_garantias.append(2)
     elif ltv <= 70: scores_garantias.append(3)
     elif ltv <= 80: scores_garantias.append(4)
     else: scores_garantias.append(5)
     map_liquidez_garantia = {"Alta (ex: aptos residenciais em capital)": 1, "Média (ex: salas comerciais, loteamentos)": 3, "Baixa (ex: imóvel de uso específico, rural)": 5}
-    scores_garantias.append(map_liquidez_garantia[st.session_state.liquidez_garantia]); score_garantias = sum(scores_garantias) / len(scores_garantias)
+    scores_garantias.append(map_liquidez_garantia[st.session_state.liquidez_garantia])
+    score_garantias = sum(scores_garantias) / len(scores_garantias)
     score_final = (score_capital * 0.40) + (score_reforco * 0.30) + (score_garantias * 0.30)
     return score_final
 
@@ -562,7 +577,7 @@ with tab3:
         st.number_input("Índice de Sobrecolateralização (%)", key='sobrecolateralizacao', help="Ex: 110 para 110%. Ocorre quando o valor do lastro é maior que o da dívida, criando um reforço.")
         st.number_input("Spread Excedente anualizado (%)", key='spread_excedente', help="Diferença positiva entre a taxa do lastro e o custo do CRI. Pode ser usado para cobrir primeiras perdas.")
     with st.expander("Fator 3: Qualidade das Garantias (Peso: 30%)"):
-        st.selectbox("Tipo de garantia predominante na estrutura", ["Alienação Fiduciária de Imóveis", "Cessão Fiduciária de Recebíveis", "Fiança ou Aval", "Sem garantia real (Fidejussória)"], key='tipo_garantia', help="Alienação Fiduciária é a garantia mais forte no mercado imobiliário brasileiro.")
+        st.multiselect("Selecione todos os tipos de garantia presentes na estrutura:", options=["Alienação Fiduciária de Imóveis", "Cessão Fiduciária de Recebíveis", "Fiança ou Aval", "Sem garantia real (Fidejussória)"], key='tipo_garantia', help="Selecione uma ou mais garantias. A combinação de múltiplas garantias robustas melhora a qualidade de crédito da operação.")
         st.number_input("LTV Médio Ponderado das garantias (%)", key='ltv_garantia', help="Loan-to-Value da garantia física. < 60% é considerado forte.")
         st.selectbox("Liquidez estimada da garantia", ["Alta (ex: aptos residenciais em capital)", "Média (ex: salas comerciais, loteamentos)", "Baixa (ex: imóvel de uso específico, rural)"], key='liquidez_garantia', help="Facilidade de transformar a garantia em caixa num cenário de execução.")
 
