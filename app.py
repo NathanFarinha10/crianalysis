@@ -28,6 +28,9 @@ def inicializar_session_state():
             'analise_credito': 'Apenas análise de renda e garantias', 'modalidade_financeira': 'Análise Corporativa (Holding/Incorporadora)',
             'dl_ebitda': 3.0, 'liq_corrente': 1.2, 'fco_divida': 15.0, 'divida_projeto': 50000000.0, 'vgv_projeto': 100000000.0,
             'custo_remanescente': 30000000.0, 'recursos_obra': 35000000.0, 'vgv_vendido': 60000000.0, 'sd_cri': 50000000.0,
+            'risco_juridico': 'Baixo / Gerenciado',
+            'risco_ambiental': 'Baixo / Gerenciado',
+            'risco_social': 'Baixo / Gerenciado',
             # Pilar 2
             'tipo_lastro': 'Desenvolvimento Imobiliário (Risco de Projeto)', 'segmento_projeto': 'Residencial Vertical',
             'qualidade_municipio': 'Capital / Metrópole', 'microlocalizacao': 'Boa', 'cidade_mapa': 'São Paulo, SP',
@@ -110,13 +113,30 @@ def ajustar_rating(rating_base, notches):
 # FUNÇÕES DE CÁLCULO DE SCORE
 # ==============================================================================
 def calcular_score_governanca():
-    scores = []; map_ubo = {"Sim": 1, "Parcialmente": 3, "Não": 5}; map_conselho = {"Independente e atuante": 1, "Majoritariamente independente": 2, "Consultivo/Sem independência": 4, "Inexistente": 5}
-    map_auditoria = {"Big Four": 1, "Outra auditoria de mercado": 2, "Não auditado": 5}; map_compliance = {"Maduras e implementadas": 1, "Em desenvolvimento": 3, "Inexistentes ou ad-hoc": 5}
-    map_litigios = {"Inexistente ou irrelevante": 1, "Baixo impacto financeiro": 2, "Médio impacto potencial": 4, "Alto impacto / Risco para a operação": 5}; map_emissor = {"Emissor recorrente com bom histórico": 1, "Poucas emissões ou histórico misto": 3, "Primeira emissão": 4, "Histórico negativo": 5}
+    def calcular_score_governanca():
+    scores = []
+    map_ubo = {"Sim": 1, "Parcialmente": 3, "Não": 5}
+    map_conselho = {"Independente e atuante": 1, "Majoritariamente independente": 2, "Consultivo/Sem independência": 4, "Inexistente": 5}
+    map_auditoria = {"Big Four": 1, "Outra auditoria de mercado": 2, "Não auditado": 5}
+    map_compliance = {"Maduras e implementadas": 1, "Em desenvolvimento": 3, "Inexistentes ou ad-hoc": 5}
+    map_litigios = {"Inexistente ou irrelevante": 1, "Baixo impacto financeiro": 2, "Médio impacto potencial": 4, "Alto impacto / Risco para a operação": 5}
+    map_emissor = {"Emissor recorrente com bom histórico": 1, "Poucas emissões ou histórico misto": 3, "Primeira emissão": 4, "Histórico negativo": 5}
     map_socios = {"Altamente experiente e com boa reputação": 1, "Experiência moderada": 3, "Inexperiente ou com reputação questionável": 5}
-    scores.append(map_ubo[st.session_state.ubo]); scores.append(map_conselho[st.session_state.conselho]); scores.append(1 if st.session_state.comites else 4); scores.append(map_auditoria[st.session_state.auditoria])
-    scores.append(5 if st.session_state.ressalvas else 1); scores.append(map_compliance[st.session_state.compliance]); scores.append(map_litigios[st.session_state.litigios]); scores.append(5 if st.session_state.renegociacao else 1)
-    scores.append(5 if st.session_state.midia_negativa else 1); scores.append(map_emissor[st.session_state.hist_emissor]); scores.append(map_socios[st.session_state.exp_socios])
+    map_risco = {"Baixo / Gerenciado": 1, "Moderado / Pontos de Atenção": 3, "Alto / Risco Relevante": 5}
+    scores.append(map_ubo[st.session_state.ubo])
+    scores.append(map_conselho[st.session_state.conselho])
+    scores.append(1 if st.session_state.comites else 4)
+    scores.append(map_auditoria[st.session_state.auditoria])
+    scores.append(5 if st.session_state.ressalvas else 1)
+    scores.append(map_compliance[st.session_state.compliance])
+    scores.append(map_litigios[st.session_state.litigios])
+    scores.append(5 if st.session_state.renegociacao else 1)
+    scores.append(5 if st.session_state.midia_negativa else 1)
+    scores.append(map_emissor[st.session_state.hist_emissor])
+    scores.append(map_socios[st.session_state.exp_socios])
+    scores.append(map_risco[st.session_state.risco_juridico])
+    scores.append(map_risco[st.session_state.risco_ambiental])
+    scores.append(map_risco[st.session_state.risco_social])
     return sum(scores) / len(scores) if scores else 5
 
 def calcular_score_operacional():
@@ -380,7 +400,15 @@ with tab1:
             st.selectbox("Nível de litígios relevantes (cíveis, fiscais, ambientais):", ["Inexistente ou irrelevante", "Baixo impacto financeiro", "Médio impacto potencial", "Alto impacto / Risco para a operação"], key='litigios', help="Processos relevantes podem indicar passivos ocultos.")
             st.checkbox("Possui comitê de auditoria e/ou riscos formalizado?", key='comites', help="Comitês especializados são um sinal de governança madura.")
             st.checkbox("Identificado envolvimento em notícias negativas de grande impacto ou investigações?", key='midia_negativa', help="Marcado indica alto risco reputacional.")
+            st.markdown("---") # Adiciona um separador visual
+            st.markdown("**Checkpoints de Risco Específico**")
 
+            opcoes_risco = ["Baixo / Gerenciado", "Moderado / Pontos de Atenção", "Alto / Risco Relevante"]
+
+            st.selectbox("Risco Jurídico/Regulatório:", opcoes_risco, key='risco_juridico', help="Avalia a exposição a litígios relevantes, ações regulatórias, ou complexidade tributária que possam gerar passivos ocultos para o originador.")
+            st.selectbox("Risco Ambiental:", opcoes_risco, key='risco_ambiental', help="Avalia riscos ligados a licenciamento ambiental, contaminação de solo, ou impacto em áreas protegidas, conforme Tabela 1 da metodologia.")
+            st.selectbox("Risco Social/Trabalhista:", opcoes_risco, key='risco_social', help="Avalia a exposição a passivos trabalhistas significativos, problemas com a comunidade local ou outras questões de impacto social.")
+            
     with st.expander("Fator 2: Histórico Operacional (Peso: 30%)"):
         c1, c2 = st.columns(2)
         with c1:
