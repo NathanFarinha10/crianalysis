@@ -443,9 +443,10 @@ with tab0:
         st.date_input("Data de Emissão:", key='op_data_emissao')
         st.date_input("Data de Vencimento:", key='op_data_vencimento')
         st.date_input("Data de Lançamento do Empreendimento:", key='op_data_lancamento_projeto')
-        [cite_start]st.text_input("Securitizadora:", key='op_securitizadora', help="Responsável por estruturar e emitir o CRI. [cite: 255]")
+        st.text_input("Securitizadora:", key='op_securitizadora', help="Responsável por estruturar e emitir o CRI.")
         st.text_input("Originador/Cedente:", key='op_originador', help="A empresa que originou os créditos (ex: a construtora).")
-        [cite_start]st.text_input("Agente Fiduciário:", key='op_agente_fiduciario', help="Representante legal dos investidores (os titulares dos CRIs). [cite: 256]")
+        st.text_input("Agente Fiduciário:", key='op_agente_fiduciario', help="Representante legal dos investidores (os titulares dos CRIs).")
+
 
 with tab1:
     st.header("Pilar 1: Análise do Risco do Originador/Devedor")
