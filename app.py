@@ -169,13 +169,23 @@ def gerar_fluxo_carteira(ss):
 def gerar_fluxo_projeto(ss):
     """
     Gera um fluxo de caixa simplificado para um projeto de desenvolvimento imobiliário.
-    Versão aprimorada com validação de colunas e conversão de tipo de dados.
+    Versão aprimorada com limpeza de dados do st.data_editor.
     """
     try:
-        # --- GARANTE QUE OS DADOS DA TABELA DE UNIDADES SEJAM UM DATAFRAME ---
-        # Chave da correção: Converte os dados do st.data_editor para um DataFrame
-        df_unidades = pd.DataFrame(ss.proj_df_unidades)
-        # --- FIM DA CORREÇÃO ---
+        unidades_data = ss.proj_df_unidades
+        
+        # --- LIMPEZA DOS DADOS VINDOS DO st.data_editor ---
+        # Filtra a lista para remover entradas que não são dicionários ou que são dicionários vazios.
+        unidades_data_limpa = [d for d in unidades_data if isinstance(d, dict) and d]
+        
+        # Se após a limpeza a lista estiver vazia, não há o que modelar.
+        if not unidades_data_limpa:
+            st.warning("A tabela de unidades está vazia ou contém apenas linhas em branco. Preencha os dados para modelar.")
+            return pd.DataFrame()
+            
+        # Garante que os dados sejam um DataFrame
+        df_unidades = pd.DataFrame(unidades_data_limpa)
+        # --- FIM DA LIMPEZA E CORREÇÃO ---
 
         # Validação das colunas da tabela de unidades
         colunas_necessarias = ['Tipo', 'Nº Unidades', 'Área m²', 'Preço/m²', 'Status']
@@ -185,7 +195,6 @@ def gerar_fluxo_projeto(ss):
             return pd.DataFrame()
 
         # Coleta de inputs do session_state (ss)
-        vgv_total = ss.proj_vgv_total
         custo_total_obra = ss.proj_custo_obra
         prazo_obra = int(ss.proj_prazo_obra)
         ivv_projetado = ss.proj_ivv_projecao / 100
