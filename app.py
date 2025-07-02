@@ -169,23 +169,32 @@ def gerar_fluxo_carteira(ss):
 def gerar_fluxo_projeto(ss):
     """
     Gera um fluxo de caixa simplificado para um projeto de desenvolvimento imobiliário.
-    Versão aprimorada com limpeza de dados do st.data_editor.
+    Versão corrigida para lidar com diferentes tipos de dados do st.data_editor.
     """
     try:
+        # --- LÓGICA ROBUSTA PARA LIDAR COM OS DADOS DO st.data_editor ---
         unidades_data = ss.proj_df_unidades
+        df_unidades = pd.DataFrame() # Inicia um DataFrame vazio
+
+        if isinstance(unidades_data, pd.DataFrame):
+            # Se os dados já são um DataFrame, apenas os copiamos
+            df_unidades = unidades_data.copy()
+            df_unidades.dropna(how='all', inplace=True) # Remove linhas que são totalmente vazias
         
-        # --- LIMPEZA DOS DADOS VINDOS DO st.data_editor ---
-        # Filtra a lista para remover entradas que não são dicionários ou que são dicionários vazios.
-        unidades_data_limpa = [d for d in unidades_data if isinstance(d, dict) and d]
-        
-        # Se após a limpeza a lista estiver vazia, não há o que modelar.
-        if not unidades_data_limpa:
+        elif isinstance(unidades_data, list):
+            # Se for uma lista, limpamos e depois convertemos para DataFrame
+            unidades_data_limpa = [d for d in unidades_data if isinstance(d, dict) and d]
+            if unidades_data_limpa:
+                df_unidades = pd.DataFrame(unidades_data_limpa)
+        else:
+            st.error(f"Formato de dados da tabela de unidades não reconhecido: {type(unidades_data)}")
+            return pd.DataFrame()
+      
+        # Após o tratamento, verificamos se o DataFrame final está vazio
+        if df_unidades.empty:
             st.warning("A tabela de unidades está vazia ou contém apenas linhas em branco. Preencha os dados para modelar.")
             return pd.DataFrame()
-            
-        # Garante que os dados sejam um DataFrame
-        df_unidades = pd.DataFrame(unidades_data_limpa)
-        # --- FIM DA LIMPEZA E CORREÇÃO ---
+        # --- FIM DA CORREÇÃO ---
 
         # Validação das colunas da tabela de unidades
         colunas_necessarias = ['Tipo', 'Nº Unidades', 'Área m²', 'Preço/m²', 'Status']
