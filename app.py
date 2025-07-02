@@ -114,6 +114,135 @@ def create_gauge_chart(score, title):
     fig.update_layout(height=250, margin={'t':40, 'b':40, 'l':30, 'r':30})
     return fig
 
+# Adicione estas duas funções na seção de Funções Auxiliares
+
+def gerar_fluxo_carteira(ss):
+    """
+    Gera um fluxo de caixa simplificado para uma carteira de recebíveis.
+    Assume que a carteira se comporta como um único empréstimo.
+    """
+    try:
+        # Coleta de inputs do session_state (ss)
+        saldo_devedor = ss.cart_sd_total
+        taxa_aa = ss.cart_taxa_media / 100
+        prazo = int(ss.cart_prazo_medio)
+        amortizacao_tipo = ss.cart_amortizacao
+
+        taxa_am = (1 + taxa_aa)**(1/12) - 1
+        
+        fluxo = []
+        saldo_atual = saldo_devedor
+
+        for mes in range(1, prazo + 1):
+            if saldo_atual < 1:
+                break
+            
+            juros = saldo_atual * taxa_am
+            
+            if amortizacao_tipo == 'Price':
+                pmt = npf.pmt(taxa_am, prazo - mes + 1, -saldo_atual)
+                principal = pmt - juros
+            elif amortizacao_tipo == 'SAC':
+                principal = saldo_devedor / prazo  # Amortização constante sobre o valor inicial
+            else: # Simplificação para Gradiente e outros como Price
+                pmt = npf.pmt(taxa_am, prazo - mes + 1, -saldo_atual)
+                principal = pmt - juros
+
+            principal = min(principal, saldo_atual) # Garante que não amortize mais que o saldo
+            
+            fluxo.append({
+                "Mês": mes,
+                "Juros Recebidos": juros,
+                "Amortização Recebida": principal,
+                "Pagamento Total": juros + principal,
+                "Saldo Devedor": saldo_atual - principal
+            })
+            
+            saldo_atual -= principal
+            
+        return pd.DataFrame(fluxo)
+    except Exception as e:
+        st.error(f"Erro ao gerar fluxo da carteira: {e}")
+        return pd.DataFrame()
+
+
+def gerar_fluxo_projeto(ss):
+    """
+    Gera um fluxo de caixa simplificado para um projeto de desenvolvimento imobiliário.
+    """
+    try:
+        # Coleta de inputs do session_state (ss)
+        vgv_total = ss.proj_vgv_total
+        custo_total_obra = ss.proj_custo_obra
+        prazo_obra = int(ss.proj_prazo_obra)
+        ivv_projetado = ss.proj_ivv_projecao / 100
+        
+        # Dados do CRI (da aba Cadastro)
+        divida_total_cri = ss.op_volume
+        taxa_cri_aa = ss.op_taxa / 100
+        prazo_cri = int(ss.op_prazo)
+        taxa_cri_am = (1 + taxa_cri_aa)**(1/12) - 1
+
+        # Lógica simplificada do "Bolsão de Unidades"
+        df_unidades = ss.proj_df_unidades
+        estoque_vgv_inicial = df_unidades[df_unidades['Status'] == 'Estoque']['Nº Unidades'].sum() * \
+                               df_unidades[df_unidades['Status'] == 'Estoque']['Preço/m²'].mean() * \
+                               df_unidades[df_unidades['Status'] == 'Estoque']['Área m²'].mean()
+
+
+        fluxo = []
+        saldo_obra_a_desembolsar = custo_total_obra
+        estoque_vgv_atual = estoque_vgv_inicial
+        saldo_devedor_cri = divida_total_cri
+        
+        # Simula por um prazo suficientemente longo
+        for mes in range(1, prazo_cri + 1):
+            # 1. Desembolso da Obra (saída de caixa)
+            desembolso_obra = 0
+            if mes <= prazo_obra and saldo_obra_a_desembolsar > 0:
+                # Curva de desembolso linear para simplificação
+                desembolso_mensal = custo_total_obra / prazo_obra
+                desembolso_obra = min(desembolso_mensal, saldo_obra_a_desembolsar)
+                saldo_obra_a_desembolsar -= desembolso_obra
+
+            # 2. Receita de Vendas (entrada de caixa)
+            receita_vendas = 0
+            if estoque_vgv_atual > 0:
+                venda_do_mes = estoque_vgv_atual * ivv_projetado
+                receita_vendas = min(venda_do_mes, estoque_vgv_atual)
+                estoque_vgv_atual -= receita_vendas
+
+            # 3. Serviço da Dívida do CRI (saída de caixa)
+            juros_cri = saldo_devedor_cri * taxa_cri_am
+            # Amortização Price para simplificação
+            pmt_cri = npf.pmt(taxa_cri_am, prazo_cri - mes + 1, -saldo_devedor_cri) if saldo_devedor_cri > 0 else 0
+            amortizacao_cri = pmt_cri - juros_cri
+            amortizacao_cri = min(amortizacao_cri, saldo_devedor_cri)
+            
+            obrigacoes_totais = juros_cri + amortizacao_cri
+
+            # 4. Fluxo de Caixa
+            caixa_liquido = receita_vendas - desembolso_obra - obrigacoes_totais
+            
+            fluxo.append({
+                "Mês": mes,
+                "Receita de Vendas": receita_vendas,
+                "Desembolso da Obra": desembolso_obra,
+                "Obrigações do CRI": obrigacoes_totais,
+                "Fluxo de Caixa Líquido": caixa_liquido,
+                "Saldo Devedor CRI": saldo_devedor_cri - amortizacao_cri,
+                "Estoque Remanescente (VGV)": estoque_vgv_atual
+            })
+            
+            saldo_devedor_cri -= amortizacao_cri
+            if saldo_devedor_cri < 1 and estoque_vgv_atual < 1 and saldo_obra_a_desembolsar < 1:
+                break
+
+        return pd.DataFrame(fluxo)
+    except Exception as e:
+        st.error(f"Erro ao gerar fluxo do projeto: {e}")
+        return pd.DataFrame()
+
 def converter_score_para_rating(score):
     if score is None: return "N/A"
     if score <= 1.25: return 'brAAA(sf)'
@@ -727,7 +856,6 @@ with tab5:
     st.header("📊 Pilar 5: Modelagem Financeira e Teste de Estresse")
     st.markdown("Esta seção é o motor quantitativo da análise. Modele o fluxo de caixa do lastro para, em seguida, validar a resiliência da estrutura através de testes de estresse.")
 
-    # Passo 1: Seletor do Tipo de Modelagem
     tipo_modelagem = st.radio(
         "Selecione a natureza do lastro para modelagem:",
         ('Projeto (Desenvolvimento Imobiliário)', 'Carteira de Recebíveis (Crédito Pulverizado)'),
@@ -736,12 +864,9 @@ with tab5:
     )
     st.divider()
 
-    # ==============================================================================
-    # MODELAGEM PARA PROJETO (DESENVOLVIMENTO IMOBILIÁRIO)
-    # ==============================================================================
     if tipo_modelagem == 'Projeto (Desenvolvimento Imobiliário)':
         st.subheader("Módulo de Modelagem: Risco de Projeto")
-        
+        # Inputs para Projeto (conforme código anterior)
         col1, col2 = st.columns(2)
         with col1:
             with st.expander("Parâmetros Gerais do Empreendimento", expanded=True):
@@ -749,71 +874,66 @@ with tab5:
                 st.number_input("Custo Total da Obra (R$)", key="proj_custo_obra")
                 st.number_input("Área Total Construída (m²)", key="proj_area_total")
                 st.number_input("Número Total de Unidades", key="proj_num_unidades", step=1)
-                
-                # Indicadores calculados
                 custo_por_m2 = st.session_state.proj_custo_obra / st.session_state.proj_area_total if st.session_state.proj_area_total else 0
                 custo_sobre_vgv = (st.session_state.proj_custo_obra / st.session_state.proj_vgv_total) * 100 if st.session_state.proj_vgv_total else 0
                 st.metric("Custo de Obra / m²", f"R$ {custo_por_m2:,.2f}")
                 st.metric("Custo de Obra / VGV", f"{custo_sobre_vgv:.2f}%")
-
         with col2:
             with st.expander("Cronograma e Desembolso da Obra", expanded=True):
                 st.number_input("Prazo da Obra (meses)", key="proj_prazo_obra", step=1)
                 st.selectbox("Curva de Desembolso da Obra", ["Linear", "Curva 'S' Simplificada"], key="proj_curva_desembolso")
-                st.info("Aqui poderíamos ter uma tabela para uma curva de desembolso customizada.", icon="ℹ️")
-
+                st.info("Modelo atual usa desembolso Linear.", icon="ℹ️")
         with st.expander("Bolsão de Unidades e Status de Vendas", expanded=True):
             st.markdown("Insira o detalhamento das unidades do empreendimento.")
-            # Usamos o data_editor para uma interface de planilha
             df_unidades = pd.DataFrame([
                 {"Tipo": "Apto 2Q", "Nº Unidades": 50, "Área m²": 60, "Preço/m²": 8000, "Status": "Estoque"},
                 {"Tipo": "Apto 3Q", "Nº Unidades": 30, "Área m²": 85, "Preço/m²": 8500, "Status": "Vendido"},
                 {"Tipo": "Cobertura", "Nº Unidades": 4, "Área m²": 150, "Preço/m²": 9500, "Status": "Permuta"},
             ])
             st.data_editor(df_unidades, key="proj_df_unidades", num_rows="dynamic")
-
         with st.expander("Projeção de Comercialização (Velocidade de Vendas)", expanded=True):
             st.slider("Velocidade de Vendas projetada (% do estoque/mês)", 0, 100, 5, key="proj_ivv_projecao", help="Índice de Velocidade de Vendas esperado para o estoque remanescente.")
         
         st.divider()
-        st.subheader("Resultados da Modelagem do Projeto")
-        # AQUI ENTRARIA A LÓGICA DE CÁLCULO E OS GRÁFICOS
-        st.info("Neste espaço, seriam exibidos os gráficos de Fluxo de Caixa da Operação (Recebíveis vs. Obrigações), a evolução do saldo devedor do CRI e outros indicadores-chave.", icon="📈")
-        # Exemplo de como poderia ser:
-        # fluxo_de_caixa_df = gerar_fluxo_projeto(st.session_state)
-        # st.line_chart(fluxo_de_caixa_df[['Receita de Vendas', 'Desembolso Total']])
 
-    # ==============================================================================
-    # MODELAGEM PARA CARTEIRA DE RECEBÍVEIS
-    # ==============================================================================
+        if st.button("Modelar Cenário Base do Projeto", use_container_width=True):
+            with st.spinner("Gerando fluxo de caixa do projeto..."):
+                st.session_state.fluxo_modelado_df = gerar_fluxo_projeto(st.session_state)
+
+        if 'fluxo_modelado_df' in st.session_state and not st.session_state.fluxo_modelado_df.empty:
+            st.subheader("Resultados da Modelagem do Projeto")
+            df = st.session_state.fluxo_modelado_df
+            st.line_chart(df.set_index('Mês')[['Receita de Vendas', 'Desembolso da Obra', 'Obrigações do CRI']])
+            st.area_chart(df.set_index('Mês')[['Fluxo de Caixa Líquido']])
+            st.line_chart(df.set_index('Mês')[['Saldo Devedor CRI', 'Estoque Remanescente (VGV)']])
+
     elif tipo_modelagem == 'Carteira de Recebíveis (Crédito Pulverizado)':
         st.subheader("Módulo de Modelagem: Risco de Crédito")
-        
+        # Inputs para Carteira (conforme código anterior)
         with st.expander("Características Gerais da Carteira", expanded=True):
             col1, col2 = st.columns(2)
             with col1:
                 st.number_input("Saldo Devedor Atual da Carteira (R$)", key="cart_sd_total")
                 st.number_input("Taxa de Juros Média Ponderada (% a.a.)", key="cart_taxa_media")
-                st.selectbox("Sistema de Amortização Predominante", ["SAC", "Price", "Gradiente"], key="cart_amortizacao")
+                st.selectbox("Sistema de Amortização Predominante", ["SAC", "Price"], key="cart_amortizacao")
             with col2:
                 st.number_input("Prazo Remanescente Médio (meses)", key="cart_prazo_medio", step=1)
                 st.slider("Percentual do Saldo com Pagamento 'Balão' (%)", 0, 100, 0, key="cart_perc_balao")
                 st.number_input("LTV Médio Ponderado dos Clientes (%)", key="cart_ltv_medio")
         
-        with st.expander("Estratificação e Histórico da Carteira", expanded=True):
-             st.info("Esta seção pode ser expandida para incluir uma análise de 'vintages' (safras), com taxas de inadimplência e pré-pagamento históricas para fundamentar as premissas do modelo.", icon="ℹ️")
-
         st.divider()
-        st.subheader("Resultados da Modelagem da Carteira")
-        # AQUI ENTRARIA A LÓGICA DE CÁLCULO E OS GRÁFICOS
-        st.info("Neste espaço, seriam exibidos os gráficos com a projeção de amortização, juros, inadimplência e pré-pagamentos, e o fluxo de caixa líquido para o CRI.", icon="📈")
-        # Exemplo de como poderia ser:
-        # fluxo_de_caixa_df = gerar_fluxo_carteira(st.session_state)
-        # st.area_chart(fluxo_de_caixa_df[['Juros Recebidos', 'Amortização Recebida']])
+        
+        if st.button("Modelar Cenário Base da Carteira", use_container_width=True):
+            with st.spinner("Gerando fluxo de caixa da carteira..."):
+                st.session_state.fluxo_modelado_df = gerar_fluxo_carteira(st.session_state)
 
-    # ==============================================================================
-    # SEÇÃO DE TESTE DE ESTRESSE (EXISTENTE)
-    # ==============================================================================
+        if 'fluxo_modelado_df' in st.session_state and not st.session_state.fluxo_modelado_df.empty:
+            st.subheader("Resultados da Modelagem da Carteira")
+            df = st.session_state.fluxo_modelado_df
+            st.area_chart(df.set_index('Mês')[['Juros Recebidos', 'Amortização Recebida']])
+            st.line_chart(df.set_index('Mês')[['Saldo Devedor']])
+
+    # Seção de Teste de Estresse
     st.divider()
     st.subheader("Validação da Estrutura: Teste de Estresse")
     st.markdown("Após modelar o cenário base, utilize esta seção para estressar as premissas e testar a resiliência dos mecanismos de proteção de crédito da estrutura.")
@@ -830,8 +950,7 @@ with tab5:
             st.number_input("Prazo Remanescente (meses)", key='prazo_p5', step=1)
             st.number_input("Despesas Fixas Mensais (R$)", key='despesas_p5')
 
-    st.markdown("---")
-    st.subheader("Definição das Premissas dos Cenários")
+    st.subheader("Definição das Premissas dos Cenários de Estresse")
     cenarios = {}
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -844,36 +963,21 @@ with tab5:
         st.markdown("#### Cenário Severo")
         cenarios['severo'] = {'inadimplencia': st.slider("Inadimplência (% a.a.)", 0.0, 40.0, key="inad_sev"), 'prepagamento': st.slider("Pré-pagamento (% a.a.)", 0.0, 20.0, key="prep_sev"), 'severidade': st.slider("Severidade da Perda (%)", 0, 100, key="sev_sev"), 'lag': st.slider("Lag de Recuperação (meses)", 0, 24, key="lag_sev", format="%d")}
 
-    st.markdown("---")
-    if st.button("Executar Simulação de Fluxo de Caixa", use_container_width=True):
-        
-        with st.spinner("Simulando cenários... Por favor, aguarde."):
+    if st.button("Executar Simulação de Teste de Estresse", use_container_width=True):
+        with st.spinner("Simulando cenários de estresse..."):
             perda_base, df_base = run_cashflow_simulation(cenarios['base'], st.session_state.saldo_lastro_p5, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro_p5, st.session_state.taxa_cri_p5, st.session_state.prazo_p5, st.session_state.despesas_p5)
             perda_mod, df_mod = run_cashflow_simulation(cenarios['moderado'], st.session_state.saldo_lastro_p5, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro_p5, st.session_state.taxa_cri_p5, st.session_state.prazo_p5, st.session_state.despesas_p5)
             perda_sev, df_sev = run_cashflow_simulation(cenarios['severo'], st.session_state.saldo_lastro_p5, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro_p5, st.session_state.taxa_cri_p5, st.session_state.prazo_p5, st.session_state.despesas_p5)
             st.session_state.resultados_pilar5 = {'perda_base': perda_base, 'perda_moderado': perda_mod, 'perda_severo': perda_sev}
-        
-        st.subheader("Resultados da Simulação")
+            st.session_state.dscr_dfs = {'base': df_base, 'moderado': df_mod, 'severo': df_sev}
+        st.success("Simulação de estresse concluída!")
+
+    if 'resultados_pilar5' in st.session_state:
+        st.subheader("Resultados da Simulação de Estresse")
         rc1, rc2, rc3 = st.columns(3)
         rc1.metric("Perda de Principal (Base)", f"R$ {st.session_state.resultados_pilar5['perda_base']:,.2f}")
         rc2.metric("Perda de Principal (Moderado)", f"R$ {st.session_state.resultados_pilar5['perda_moderado']:,.2f}")
         rc3.metric("Perda de Principal (Severo)", f"R$ {st.session_state.resultados_pilar5['perda_severo']:,.2f}")
-        
-        st.markdown("---")
-        st.subheader("Gráficos de Performance")
-        
-        df_dscr = pd.DataFrame({'Base': df_base.set_index('Mês')['DSCR'],'Moderado': df_mod.set_index('Mês')['DSCR'],'Severo': df_sev.set_index('Mês')['DSCR']})
-        fig_dscr = go.Figure()
-        for cenario in df_dscr.columns:
-            fig_dscr.add_trace(go.Scatter(x=df_dscr.index, y=df_dscr[cenario], mode='lines', name=cenario))
-        fig_dscr.add_hline(y=1.0, line_dash="dot", line_color="red", annotation_text="DSCR = 1.0x", annotation_position="bottom right")
-        fig_dscr.update_layout(title="DSCR (Cobertura do Serviço da Dívida) por Cenário", xaxis_title="Mês da Operação", yaxis_title="Índice DSCR", legend_title="Cenários")
-        st.plotly_chart(fig_dscr, use_container_width=True)
-        st.caption("Gráfico 1: Análise da capacidade de pagamento da operação. Valores abaixo de 1.0x indicam insuficiência de caixa para cobrir o serviço da dívida.")
-        
-        df_saldos = pd.DataFrame({'Lastro (Base)': df_base.set_index('Mês')['Saldo Devedor Lastro'],'CRI (Base)': df_base.set_index('Mês')['Saldo Devedor CRI'],'Lastro (Severo)': df_sev.set_index('Mês')['Saldo Devedor Lastro'],'CRI (Severo)': df_sev.set_index('Mês')['Saldo Devedor CRI'],})
-        st.area_chart(df_saldos, use_container_width=True)
-        st.caption("Gráfico 2: Amortização dos Saldos Devedores do Lastro vs. CRI.")
 
 
 with tab6:
