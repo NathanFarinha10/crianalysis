@@ -21,6 +21,7 @@ def inicializar_session_state():
         defaults = {
             # Pilar 1
             'hist_emissor': 'Primeira emissão', 'exp_socios': 'Experiência moderada', 'ubo': 'Sim',
+            'hist_socios': 'Primeiro empreendimento ou histórico desconhecido',
             'conselho': 'Consultivo/Sem independência', 'comites': False, 'auditoria': 'Auditoria de Grande Porte (fora do Big Four)',
             'ressalvas': False, 'compliance': 'Em desenvolvimento', 'litigios': 'Baixo impacto financeiro',
             'renegociacao': False, 'midia_negativa': False, 'exp_similar': 'Experiência relevante em segmentos correlatos',
@@ -139,10 +140,18 @@ def calcular_score_governanca():
     return sum(scores) / len(scores) if scores else 5
 
 def calcular_score_operacional():
-    scores = []; map_track_record = {"Consistente e previsível": 1, "Desvios esporádicos": 3, "Atrasos e estouros recorrentes": 5}; map_reputacao = {"Positiva, baixo volume de queixas": 1, "Neutra, volume gerenciável": 3, "Negativa, alto volume de queixas sem resolução": 5}
-    map_politica_credito = {"Score de crédito, análise de renda (DTI) e garantias": 1, "Apenas análise de renda e garantias": 3, "Análise simplificada ou ad-hoc": 5}; map_exp_similar = {"Extensa e comprovada no segmento específico": 1, "Experiência relevante em segmentos correlatos": 2, "Experiência limitada ou em outros segmentos": 4, "Iniciante/Nenhuma": 5}
-    scores.append(map_track_record[st.session_state.track_record]); scores.append(map_reputacao[st.session_state.reputacao]); scores.append(1 if st.session_state.politica_formalizada else 4)
-    scores.append(map_politica_credito[st.session_state.analise_credito]); scores.append(map_exp_similar[st.session_state.exp_similar])
+    scores = []
+    map_track_record = {"Consistente e previsível": 1, "Desvios esporádicos": 3, "Atrasos e estouros recorrentes": 5}
+    map_reputacao = {"Positiva, baixo volume de queixas": 1, "Neutra, volume gerenciável": 3, "Negativa, alto volume de queixas sem resolução": 5}
+    map_politica_credito = {"Score de crédito, análise de renda (DTI) e garantias": 1, "Apenas análise de renda e garantias": 3, "Análise simplificada ou ad-hoc": 5}
+    map_exp_similar = {"Extensa e comprovada no segmento específico": 1, "Experiência relevante em segmentos correlatos": 2, "Experiência limitada ou em outros segmentos": 4, "Iniciante/Nenhuma": 5}
+    map_hist_socios = {"Sócio(s) com múltiplos empreendimentos de sucesso comprovado": 1, "Sócio(s) com algum histórico de sucesso, sem falhas relevantes": 2, "Primeiro empreendimento ou histórico desconhecido": 4, "Sócio(s) com histórico de falências ou recuperações judiciais": 5}
+    scores.append(map_track_record[st.session_state.track_record])
+    scores.append(map_reputacao[st.session_state.reputacao])
+    scores.append(1 if st.session_state.politica_formalizada else 4)
+    scores.append(map_politica_credito[st.session_state.analise_credito])
+    scores.append(map_exp_similar[st.session_state.exp_similar])
+    scores.append(map_hist_socios[st.session_state.hist_socios])
     return sum(scores) / len(scores) if scores else 5
 
 def calcular_score_financeiro():
@@ -428,6 +437,7 @@ with tab1:
         with c1:
             st.selectbox("Experiência em projetos semelhantes:", ["Extensa e comprovada no segmento específico", "Experiência relevante em segmentos correlatos", "Experiência limitada ou em outros segmentos", "Iniciante/Nenhuma"], key='exp_similar', help="Avalia o track record do devedor em projetos com o mesmo perfil de risco.")
             st.selectbox("Reputação e nível de satisfação de clientes (ex: Reclame Aqui):", ["Positiva, baixo volume de queixas", "Neutra, volume gerenciável", "Negativa, alto volume de queixas sem resolução"], key='reputacao', help="A satisfação do cliente final impacta a performance de carteiras e a imagem da empresa.")
+            st.selectbox("Histórico dos sócios em outros empreendimentos:", options=["Sócio(s) com múltiplos empreendimentos de sucesso comprovado", "Sócio(s) com algum histórico de sucesso, sem falhas relevantes", "Primeiro empreendimento ou histórico desconhecido", "Sócio(s) com histórico de falências ou recuperações judiciais"], key='hist_socios', help="Avalia o histórico pessoal dos sócios. Um passado com empreendimentos problemáticos é um sinal de alerta, mesmo que a empresa atual seja nova.")
         with c2:
             st.selectbox("Histórico de entrega de projetos (prazo e orçamento):", ["Consistente e previsível", "Desvios esporádicos", "Atrasos e estouros recorrentes"], key='track_record', help="Avalia a capacidade de execução da companhia.")
             st.selectbox("A análise de crédito para os recebíveis inclui:", ["Score de crédito, análise de renda (DTI) e garantias", "Apenas análise de renda e garantias", "Análise simplificada ou ad-hoc"], key='analise_credito', help="Reflete a qualidade do processo que origina o lastro.")
