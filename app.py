@@ -21,7 +21,7 @@ def inicializar_session_state():
         defaults = {
             # Pilar 1
             'hist_emissor': 'Primeira emissão', 'exp_socios': 'Experiência moderada', 'ubo': 'Sim',
-            'conselho': 'Consultivo/Sem independência', 'comites': False, 'auditoria': 'Outra auditoria de mercado',
+            'conselho': 'Consultivo/Sem independência', 'comites': False, 'auditoria': 'Auditoria de Grande Porte (fora do Big Four)',
             'ressalvas': False, 'compliance': 'Em desenvolvimento', 'litigios': 'Baixo impacto financeiro',
             'renegociacao': False, 'midia_negativa': False, 'exp_similar': 'Experiência relevante em segmentos correlatos',
             'track_record': 'Desvios esporádicos', 'reputacao': 'Neutra, volume gerenciável', 'politica_formalizada': True,
@@ -116,7 +116,7 @@ def calcular_score_governanca():
     scores = []
     map_ubo = {"Sim": 1, "Parcialmente": 3, "Não": 5}
     map_conselho = {"Independente e atuante": 1, "Majoritariamente independente": 2, "Consultivo/Sem independência": 4, "Inexistente": 5}
-    map_auditoria = {"Big Four": 1, "Outra auditoria de mercado": 2, "Não auditado": 5}
+    map_auditoria = {"Big Four": 1, "Auditoria de Grande Porte (fora do Big Four)": 2, "Auditoria de Pequeno Porte/Contador": 4, "Não auditado": 5}
     map_compliance = {"Maduras e implementadas": 1, "Em desenvolvimento": 3, "Inexistentes ou ad-hoc": 5}
     map_litigios = {"Inexistente ou irrelevante": 1, "Baixo impacto financeiro": 2, "Médio impacto potencial": 4, "Alto impacto / Risco para a operação": 5}
     map_emissor = {"Emissor recorrente com bom histórico": 1, "Poucas emissões ou histórico misto": 3, "Primeira emissão": 4, "Histórico negativo": 5}
@@ -395,7 +395,7 @@ with tab1:
         with c2:
             st.selectbox("Experiência do quadro societário/executivo:", ["Altamente experiente e com boa reputação", "Experiência moderada", "Inexperiente ou com reputação questionável"], key='exp_socios', help="Analisa o histórico e a reputação dos tomadores de decisão.")
             st.selectbox("Qual a estrutura do conselho de administração?", ["Independente e atuante", "Majoritariamente independente", "Consultivo/Sem independência", "Inexistente"], key='conselho', help="Conselhos independentes melhoram a governança.")
-            st.selectbox("As demonstrações financeiras são auditadas por:", ["Big Four", "Outra auditoria de mercado", "Não auditado"], key='auditoria', help="Auditoria por empresas de primeira linha aumenta a credibilidade das informações.")
+            st.selectbox("As demonstrações financeiras são auditadas por:", ["Big Four", "Auditoria de Grande Porte (fora do Big Four)", "Auditoria de Pequeno Porte/Contador", "Não auditado"], key='auditoria', help="A reputação da auditoria reflete a credibilidade das informações financeiras.")
             st.selectbox("Nível de litígios relevantes (cíveis, fiscais, ambientais):", ["Inexistente ou irrelevante", "Baixo impacto financeiro", "Médio impacto potencial", "Alto impacto / Risco para a operação"], key='litigios', help="Processos relevantes podem indicar passivos ocultos.")
             st.checkbox("Possui comitê de auditoria e/ou riscos formalizado?", key='comites', help="Comitês especializados são um sinal de governança madura.")
             st.checkbox("Identificado envolvimento em notícias negativas de grande impacto ou investigações?", key='midia_negativa', help="Marcado indica alto risco reputacional.")
