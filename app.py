@@ -972,7 +972,7 @@ with tab5:
             st.session_state.dscr_dfs = {'base': df_base, 'moderado': df_mod, 'severo': df_sev}
         st.success("Simulação de estresse concluída!")
 
-    if 'resultados_pilar5' in st.session_state:
+    if st.session_state.get('resultados_pilar5') is not None:
         st.subheader("Resultados da Simulação de Estresse")
         rc1, rc2, rc3 = st.columns(3)
         rc1.metric("Perda de Principal (Base)", f"R$ {st.session_state.resultados_pilar5['perda_base']:,.2f}")
