@@ -5,6 +5,7 @@ import numpy_financial as npf
 import plotly.graph_objects as go
 from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
+import datetime
 
 # ==============================================================================
 # INICIALIZAÇÃO E FUNÇÕES AUXILIARES
@@ -19,6 +20,19 @@ def inicializar_session_state():
         st.session_state.map_data = None
 
         defaults = {
+            # Aba Cadastro
+            'op_nome': 'CRI Exemplo Towers',
+            'op_codigo': 'EXMP11',
+            'op_securitizadora': 'Exemplo Securitizadora S.A.',
+            'op_originador': 'Construtora Exemplo Ltda',
+            'op_agente_fiduciario': 'Exemplo Trust DTVM',
+            'op_volume': 150000000.0,
+            'op_taxa': 10.5,
+            'op_indexador': 'IPCA +',
+            'op_prazo': 120,
+            'op_data_emissao': datetime.date(2024, 1, 15),
+            'op_data_vencimento': datetime.date(2034, 1, 15),
+            'op_data_lancamento_projeto': datetime.date(2023, 6, 1),
             # Pilar 1
             'hist_emissor': 'Primeira emissão', 'exp_socios': 'Experiência moderada', 'ubo': 'Sim',
             'hist_socios': 'Primeiro empreendimento ou histórico desconhecido',
@@ -399,10 +413,39 @@ st.markdown("Desenvolvido em parceria com a IA 'Projeto de Análise e Rating de 
 
 inicializar_session_state()
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "Pilar 1: Originador", "Pilar 2: Lastro", "Pilar 3: Estrutura",
+tab0, tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    "📝 Cadastro da Operação", "Pilar 1: Originador", "Pilar 2: Lastro", "Pilar 3: Estrutura",
     "Pilar 4: Governança", "Pilar 5: Estresse", "Resultado Final"
 ])
+
+with tab0:
+    st.header("Informações Gerais da Operação (Folha de Rosto)")
+    st.markdown("Dados descritivos para identificação e composição do relatório final. **Não impactam o cálculo do rating.**")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("Identificação da Emissão")
+        st.text_input("Nome da Operação:", key='op_nome')
+        st.text_input("Código de Negociação (CETIP/B3):", key='op_codigo')
+        st.number_input("Volume Total Emitido (R$):", key='op_volume', format="%.2f")
+        
+        c1_taxa, c2_taxa = st.columns([1,2])
+        with c1_taxa:
+            st.selectbox("Indexador:", ["IPCA +", "CDI +", "Pré-fixado"], key='op_indexador')
+        with c2_taxa:
+            st.number_input("Taxa (% a.a.):", key='op_taxa', format="%.2f")
+        
+        st.number_input("Prazo Total da Emissão (meses):", key='op_prazo', step=1)
+
+    with col2:
+        st.subheader("Datas e Participantes")
+        st.date_input("Data de Emissão:", key='op_data_emissao')
+        st.date_input("Data de Vencimento:", key='op_data_vencimento')
+        st.date_input("Data de Lançamento do Empreendimento:", key='op_data_lancamento_projeto')
+        [cite_start]st.text_input("Securitizadora:", key='op_securitizadora', help="Responsável por estruturar e emitir o CRI. [cite: 255]")
+        st.text_input("Originador/Cedente:", key='op_originador', help="A empresa que originou os créditos (ex: a construtora).")
+        [cite_start]st.text_input("Agente Fiduciário:", key='op_agente_fiduciario', help="Representante legal dos investidores (os titulares dos CRIs). [cite: 256]")
 
 with tab1:
     st.header("Pilar 1: Análise do Risco do Originador/Devedor")
