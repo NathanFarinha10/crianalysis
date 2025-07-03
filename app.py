@@ -77,6 +77,7 @@ def inicializar_session_state():
             'prazo_p5': 60, 'despesas_p5': 10000.0, 'inad_base': 2.0, 'prep_base': 10.0, 'sev_base': 30, 'lag_base': 12,
             'inad_mod': 5.0, 'prep_mod': 5.0, 'sev_mod': 50, 'lag_mod': 18, 'inad_sev': 10.0, 'prep_sev': 2.0, 'sev_sev': 70,
             'lag_sev': 24,
+            'proj_tipologias': [{'nome': 'Apto Padrão', 'area': 75.0, 'estoque': 50, 'vendidas': 10, 'permutadas': 2, 'preco_m2': 9000.0}],
             
             # Resultado Final
             'ajuste_final': 0, 'rating_subordinada': 'Não Avaliado', 'justificativa_final': ''
@@ -168,50 +169,23 @@ def gerar_fluxo_carteira(ss):
 
 def gerar_fluxo_projeto(ss):
     """
-    Gera um fluxo de caixa simplificado para um projeto de desenvolvimento imobiliário.
-    Versão final com tratamento para DataFrame, Lista e Dicionário (de listas) vindos do st.data_editor.
+    Gera um fluxo de caixa para um projeto de desenvolvimento.
+    Versão refatorada para usar a nova estrutura de input de tipologias.
     """
     try:
-        # --- LÓGICA ROBUSTA PARA LIDAR COM OS DADOS DO st.data_editor ---
-        unidades_data = ss.proj_df_unidades
-        df_unidades = pd.DataFrame() # Inicia um DataFrame vazio
+        # Passo 1: Converter a lista de tipologias em um DataFrame limpo.
+        # Não precisamos mais de validações complexas.
+        df_unidades = pd.DataFrame(ss.proj_tipologias)
 
-        if isinstance(unidades_data, pd.DataFrame):
-            df_unidades = unidades_data.copy()
-            df_unidades.dropna(how='all', inplace=True)
-        
-        elif isinstance(unidades_data, list):
-            unidades_data_limpa = [d for d in unidades_data if isinstance(d, dict) and d]
-            if unidades_data_limpa:
-                df_unidades = pd.DataFrame(unidades_data_limpa)
-        
-        elif isinstance(unidades_data, dict):
-            # --- LÓGICA CORRIGIDA para o caso de dicionário ---
-            # Converte os valores do dicionário (que são as linhas) para uma lista
-            lista_de_linhas = list(unidades_data.values())
-            # Define as colunas na ordem esperada
-            colunas = ['Tipo', 'Nº Unidades', 'Área m²', 'Preço/m²', 'Status']
-            # Cria o DataFrame a partir da lista de linhas e nomes de colunas
-            df_unidades = pd.DataFrame(lista_de_linhas, columns=colunas)
-            df_unidades.dropna(how='all', inplace=True)
-            # --- FIM DA CORREÇÃO ---
-
-        else:
-            st.error(f"Formato de dados da tabela de unidades não reconhecido: {type(unidades_data)}")
-            return pd.DataFrame()
-      
         if df_unidades.empty:
-            st.warning("A tabela de unidades está vazia ou contém apenas linhas em branco. Preencha os dados para modelar.")
+            st.warning("Adicione e configure pelo menos uma tipologia de unidade para modelar.")
             return pd.DataFrame()
 
-        # Validação das colunas da tabela de unidades
-        colunas_necessarias = ['Tipo', 'Nº Unidades', 'Área m²', 'Preço/m²', 'Status']
-        colunas_faltantes = [col for col in colunas_necessarias if col not in df_unidades.columns]
-        if colunas_faltantes:
-            st.error(f"Erro de modelagem: A tabela de unidades não contém as colunas necessárias. Colunas faltando: {colunas_faltantes}")
-            return pd.DataFrame()
+        # Passo 2: Calcular o VGV de estoque inicial a partir do DataFrame
+        df_unidades['VGV Estoque'] = df_unidades['estoque'] * df_unidades['area'] * df_unidades['preco_m2']
+        estoque_vgv_inicial = df_unidades['VGV Estoque'].sum()
 
-        # Coleta de inputs do session_state (ss)
+        # Passo 3: Coletar outros parâmetros da simulação
         custo_total_obra = ss.proj_custo_obra
         prazo_obra = int(ss.proj_prazo_obra)
         ivv_projetado = ss.proj_ivv_projecao / 100
@@ -221,18 +195,7 @@ def gerar_fluxo_projeto(ss):
         prazo_cri = int(ss.op_prazo)
         taxa_cri_am = (1 + taxa_cri_aa)**(1/12) - 1
 
-        # Lógica do "Bolsão de Unidades"
-        df_unidades['Nº Unidades'] = pd.to_numeric(df_unidades['Nº Unidades'])
-        df_unidades['Preço/m²'] = pd.to_numeric(df_unidades['Preço/m²'])
-        df_unidades['Área m²'] = pd.to_numeric(df_unidades['Área m²'])
-
-        estoque_df = df_unidades[df_unidades['Status'] == 'Estoque']
-        if not estoque_df.empty:
-            vgv_unidades_estoque = (estoque_df['Preço/m²'] * estoque_df['Área m²'] * estoque_df['Nº Unidades'])
-            estoque_vgv_inicial = vgv_unidades_estoque.sum()
-        else:
-            estoque_vgv_inicial = 0
-
+        # Passo 4: Rodar a simulação mês a mês
         fluxo = []
         saldo_obra_a_desembolsar = custo_total_obra
         estoque_vgv_atual = estoque_vgv_inicial
@@ -260,13 +223,9 @@ def gerar_fluxo_projeto(ss):
             caixa_liquido = receita_vendas - desembolso_obra - obrigacoes_totais
             
             fluxo.append({
-                "Mês": mes,
-                "Receita de Vendas": receita_vendas,
-                "Desembolso da Obra": desembolso_obra,
-                "Obrigações do CRI": obrigacoes_totais,
-                "Fluxo de Caixa Líquido": caixa_liquido,
-                "Saldo Devedor CRI": saldo_devedor_cri - amortizacao_cri,
-                "Estoque Remanescente (VGV)": estoque_vgv_atual
+                "Mês": mes, "Receita de Vendas": receita_vendas, "Desembolso da Obra": desembolso_obra,
+                "Obrigações do CRI": obrigacoes_totais, "Fluxo de Caixa Líquido": caixa_liquido,
+                "Saldo Devedor CRI": saldo_devedor_cri - amortizacao_cri, "Estoque Remanescente (VGV)": estoque_vgv_atual
             })
             
             saldo_devedor_cri -= amortizacao_cri
@@ -277,7 +236,7 @@ def gerar_fluxo_projeto(ss):
     except Exception as e:
         st.error(f"Erro ao gerar fluxo do projeto: {e}")
         return pd.DataFrame()
-
+        
 def converter_score_para_rating(score):
     if score is None: return "N/A"
     if score <= 1.25: return 'brAAA(sf)'
@@ -918,14 +877,47 @@ with tab5:
                 st.number_input("Prazo da Obra (meses)", key="proj_prazo_obra", step=1)
                 st.selectbox("Curva de Desembolso da Obra", ["Linear", "Curva 'S' Simplificada"], key="proj_curva_desembolso")
                 st.info("Modelo atual usa desembolso Linear.", icon="ℹ️")
-        with st.expander("Bolsão de Unidades e Status de Vendas", expanded=True):
-            st.markdown("Insira o detalhamento das unidades do empreendimento.")
-            df_unidades = pd.DataFrame([
-                {"Tipo": "Apto 2Q", "Nº Unidades": 50, "Área m²": 60, "Preço/m²": 8000, "Status": "Estoque"},
-                {"Tipo": "Apto 3Q", "Nº Unidades": 30, "Área m²": 85, "Preço/m²": 8500, "Status": "Vendido"},
-                {"Tipo": "Cobertura", "Nº Unidades": 4, "Área m²": 150, "Preço/m²": 9500, "Status": "Permuta"},
-            ])
-            st.data_editor(df_unidades, key="proj_df_unidades", num_rows="dynamic")
+        # SUBSTITUA o expander "Bolsão de Unidades" inteiro por este:
+
+with st.expander("Bolsão de Unidades e Status de Vendas", expanded=True):
+    st.markdown("Adicione e configure cada tipo de unidade do empreendimento.")
+
+    # Botão para adicionar novas tipologias à lista no session_state
+    if st.button("Adicionar Nova Tipologia de Unidade", use_container_width=True):
+        nova_tipologia = {
+            'nome': f'Nova Tipologia {len(st.session_state.proj_tipologias) + 1}',
+            'area': 70.0, 'estoque': 10, 'vendidas': 0, 'permutadas': 0, 'preco_m2': 10000.0
+        }
+        st.session_state.proj_tipologias.append(nova_tipologia)
+
+    st.divider()
+
+    # Itera sobre a lista de tipologias no session_state para criar os campos de input
+    for i, tipologia in enumerate(st.session_state.proj_tipologias):
+        with st.container(border=True):
+            col1, col2, col3 = st.columns([2, 1, 1])
+            
+            # Usamos o 'value' para preencher com o dado atual e 'key' para identificar unicamente
+            st.session_state.proj_tipologias[i]['nome'] = col1.text_input(
+                "Nome da Tipologia", value=tipologia['nome'], key=f"nome_{i}"
+            )
+            st.session_state.proj_tipologias[i]['area'] = col2.number_input(
+                "Área Média (m²)", value=tipologia['area'], key=f"area_{i}"
+            )
+            st.session_state.proj_tipologias[i]['preco_m2'] = col3.number_input(
+                "Preço/m² (R$)", value=tipologia['preco_m2'], key=f"preco_m2_{i}"
+            )
+
+            col_unid1, col_unid2, col_unid3 = st.columns(3)
+            st.session_state.proj_tipologias[i]['estoque'] = col_unid1.number_input(
+                "Unidades em Estoque", value=tipologia['estoque'], step=1, key=f"estoque_{i}"
+            )
+            st.session_state.proj_tipologias[i]['vendidas'] = col_unid2.number_input(
+                "Unidades Vendidas", value=tipologia['vendidas'], step=1, key=f"vendidas_{i}"
+            )
+            st.session_state.proj_tipologias[i]['permutadas'] = col_unid3.number_input(
+                "Unidades Permutadas", value=tipologia['permutadas'], step=1, key=f"permutadas_{i}"
+            )
         with st.expander("Projeção de Comercialização (Velocidade de Vendas)", expanded=True):
             st.slider("Velocidade de Vendas projetada (% do estoque/mês)", 0, 100, 5, key="proj_ivv_projecao", help="Índice de Velocidade de Vendas esperado para o estoque remanescente.")
         
