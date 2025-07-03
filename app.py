@@ -850,6 +850,7 @@ with tab5:
     st.header("📊 Pilar 5: Modelagem Financeira e Teste de Estresse")
     st.markdown("Esta seção é o motor quantitativo da análise. Modele o fluxo de caixa do lastro para, em seguida, validar a resiliência da estrutura através de testes de estresse.")
 
+    # Passo 1: Seletor do Tipo de Modelagem
     tipo_modelagem = st.radio(
         "Selecione a natureza do lastro para modelagem:",
         ('Projeto (Desenvolvimento Imobiliário)', 'Carteira de Recebíveis (Crédito Pulverizado)'),
@@ -858,9 +859,12 @@ with tab5:
     )
     st.divider()
 
+    # ==============================================================================
+    # MODELAGEM PARA PROJETO (DESENVOLVIMENTO IMOBILIÁRIO)
+    # ==============================================================================
     if tipo_modelagem == 'Projeto (Desenvolvimento Imobiliário)':
         st.subheader("Módulo de Modelagem: Risco de Projeto")
-        # Inputs para Projeto (conforme código anterior)
+        
         col1, col2 = st.columns(2)
         with col1:
             with st.expander("Parâmetros Gerais do Empreendimento", expanded=True):
@@ -868,61 +872,48 @@ with tab5:
                 st.number_input("Custo Total da Obra (R$)", key="proj_custo_obra")
                 st.number_input("Área Total Construída (m²)", key="proj_area_total")
                 st.number_input("Número Total de Unidades", key="proj_num_unidades", step=1)
+                
+                # Indicadores calculados
                 custo_por_m2 = st.session_state.proj_custo_obra / st.session_state.proj_area_total if st.session_state.proj_area_total else 0
                 custo_sobre_vgv = (st.session_state.proj_custo_obra / st.session_state.proj_vgv_total) * 100 if st.session_state.proj_vgv_total else 0
                 st.metric("Custo de Obra / m²", f"R$ {custo_por_m2:,.2f}")
                 st.metric("Custo de Obra / VGV", f"{custo_sobre_vgv:.2f}%")
+
         with col2:
             with st.expander("Cronograma e Desembolso da Obra", expanded=True):
                 st.number_input("Prazo da Obra (meses)", key="proj_prazo_obra", step=1)
                 st.selectbox("Curva de Desembolso da Obra", ["Linear", "Curva 'S' Simplificada"], key="proj_curva_desembolso")
                 st.info("Modelo atual usa desembolso Linear.", icon="ℹ️")
-        # SUBSTITUA o expander "Bolsão de Unidades" inteiro por este:
 
-with st.expander("Bolsão de Unidades e Status de Vendas", expanded=True):
-    st.markdown("Adicione e configure cada tipo de unidade do empreendimento.")
+        with st.expander("Bolsão de Unidades e Status de Vendas", expanded=True):
+            st.markdown("Adicione e configure cada tipo de unidade do empreendimento.")
 
-    # Botão para adicionar novas tipologias à lista no session_state
-    if st.button("Adicionar Nova Tipologia de Unidade", use_container_width=True):
-        nova_tipologia = {
-            'nome': f'Nova Tipologia {len(st.session_state.proj_tipologias) + 1}',
-            'area': 70.0, 'estoque': 10, 'vendidas': 0, 'permutadas': 0, 'preco_m2': 10000.0
-        }
-        st.session_state.proj_tipologias.append(nova_tipologia)
+            if st.button("Adicionar Nova Tipologia de Unidade", use_container_width=True):
+                nova_tipologia = {
+                    'nome': f'Nova Tipologia {len(st.session_state.proj_tipologias) + 1}',
+                    'area': 70.0, 'estoque': 10, 'vendidas': 0, 'permutadas': 0, 'preco_m2': 10000.0
+                }
+                st.session_state.proj_tipologias.append(nova_tipologia)
 
-    st.divider()
+            st.divider()
 
-    # Itera sobre a lista de tipologias no session_state para criar os campos de input
-    for i, tipologia in enumerate(st.session_state.proj_tipologias):
-        with st.container(border=True):
-            col1, col2, col3 = st.columns([2, 1, 1])
-            
-            # Usamos o 'value' para preencher com o dado atual e 'key' para identificar unicamente
-            st.session_state.proj_tipologias[i]['nome'] = col1.text_input(
-                "Nome da Tipologia", value=tipologia['nome'], key=f"nome_{i}"
-            )
-            st.session_state.proj_tipologias[i]['area'] = col2.number_input(
-                "Área Média (m²)", value=tipologia['area'], key=f"area_{i}"
-            )
-            st.session_state.proj_tipologias[i]['preco_m2'] = col3.number_input(
-                "Preço/m² (R$)", value=tipologia['preco_m2'], key=f"preco_m2_{i}"
-            )
+            for i, tipologia in enumerate(st.session_state.proj_tipologias):
+                with st.container(border=True):
+                    col1, col2, col3 = st.columns([2, 1, 1])
+                    
+                    st.session_state.proj_tipologias[i]['nome'] = col1.text_input(f"Nome da Tipologia", value=tipologia['nome'], key=f"nome_{i}")
+                    st.session_state.proj_tipologias[i]['area'] = col2.number_input(f"Área Média (m²)", value=tipologia['area'], key=f"area_{i}")
+                    st.session_state.proj_tipologias[i]['preco_m2'] = col3.number_input(f"Preço/m² (R$)", value=tipologia['preco_m2'], key=f"preco_m2_{i}")
 
-            col_unid1, col_unid2, col_unid3 = st.columns(3)
-            st.session_state.proj_tipologias[i]['estoque'] = col_unid1.number_input(
-                "Unidades em Estoque", value=tipologia['estoque'], step=1, key=f"estoque_{i}"
-            )
-            st.session_state.proj_tipologias[i]['vendidas'] = col_unid2.number_input(
-                "Unidades Vendidas", value=tipologia['vendidas'], step=1, key=f"vendidas_{i}"
-            )
-            st.session_state.proj_tipologias[i]['permutadas'] = col_unid3.number_input(
-                "Unidades Permutadas", value=tipologia['permutadas'], step=1, key=f"permutadas_{i}"
-            )
+                    col_unid1, col_unid2, col_unid3 = st.columns(3)
+                    st.session_state.proj_tipologias[i]['estoque'] = col_unid1.number_input(f"Unidades em Estoque", value=tipologia['estoque'], step=1, key=f"estoque_{i}")
+                    st.session_state.proj_tipologias[i]['vendidas'] = col_unid2.number_input(f"Unidades Vendidas", value=tipologia['vendidas'], step=1, key=f"vendidas_{i}")
+                    st.session_state.proj_tipologias[i]['permutadas'] = col_unid3.number_input(f"Unidades Permutadas", value=tipologia['permutadas'], step=1, key=f"permutadas_{i}")
+
         with st.expander("Projeção de Comercialização (Velocidade de Vendas)", expanded=True):
             st.slider("Velocidade de Vendas projetada (% do estoque/mês)", 0, 100, 5, key="proj_ivv_projecao", help="Índice de Velocidade de Vendas esperado para o estoque remanescente.")
         
         st.divider()
-
         if st.button("Modelar Cenário Base do Projeto", use_container_width=True):
             with st.spinner("Gerando fluxo de caixa do projeto..."):
                 st.session_state.fluxo_modelado_df = gerar_fluxo_projeto(st.session_state)
@@ -934,9 +925,12 @@ with st.expander("Bolsão de Unidades e Status de Vendas", expanded=True):
             st.area_chart(df.set_index('Mês')[['Fluxo de Caixa Líquido']])
             st.line_chart(df.set_index('Mês')[['Saldo Devedor CRI', 'Estoque Remanescente (VGV)']])
 
+    # ==============================================================================
+    # MODELAGEM PARA CARTEIRA DE RECEBÍVEIS
+    # ==============================================================================
     elif tipo_modelagem == 'Carteira de Recebíveis (Crédito Pulverizado)':
         st.subheader("Módulo de Modelagem: Risco de Crédito")
-        # Inputs para Carteira (conforme código anterior)
+        
         with st.expander("Características Gerais da Carteira", expanded=True):
             col1, col2 = st.columns(2)
             with col1:
@@ -960,7 +954,9 @@ with st.expander("Bolsão de Unidades e Status de Vendas", expanded=True):
             st.area_chart(df.set_index('Mês')[['Juros Recebidos', 'Amortização Recebida']])
             st.line_chart(df.set_index('Mês')[['Saldo Devedor']])
 
-    # Seção de Teste de Estresse
+    # ==============================================================================
+    # SEÇÃO DE TESTE DE ESTRESSE (COMUM A AMBOS)
+    # ==============================================================================
     st.divider()
     st.subheader("Validação da Estrutura: Teste de Estresse")
     st.markdown("Após modelar o cenário base, utilize esta seção para estressar as premissas e testar a resiliência dos mecanismos de proteção de crédito da estrutura.")
@@ -996,7 +992,6 @@ with st.expander("Bolsão de Unidades e Status de Vendas", expanded=True):
             perda_mod, df_mod = run_cashflow_simulation(cenarios['moderado'], st.session_state.saldo_lastro_p5, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro_p5, st.session_state.taxa_cri_p5, st.session_state.prazo_p5, st.session_state.despesas_p5)
             perda_sev, df_sev = run_cashflow_simulation(cenarios['severo'], st.session_state.saldo_lastro_p5, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro_p5, st.session_state.taxa_cri_p5, st.session_state.prazo_p5, st.session_state.despesas_p5)
             st.session_state.resultados_pilar5 = {'perda_base': perda_base, 'perda_moderado': perda_mod, 'perda_severo': perda_sev}
-            st.session_state.dscr_dfs = {'base': df_base, 'moderado': df_mod, 'severo': df_sev}
         st.success("Simulação de estresse concluída!")
 
     if st.session_state.get('resultados_pilar5') is not None:
@@ -1005,7 +1000,6 @@ with st.expander("Bolsão de Unidades e Status de Vendas", expanded=True):
         rc1.metric("Perda de Principal (Base)", f"R$ {st.session_state.resultados_pilar5['perda_base']:,.2f}")
         rc2.metric("Perda de Principal (Moderado)", f"R$ {st.session_state.resultados_pilar5['perda_moderado']:,.2f}")
         rc3.metric("Perda de Principal (Severo)", f"R$ {st.session_state.resultados_pilar5['perda_severo']:,.2f}")
-
 
 with tab6:
     st.header("Resultado Final e Atribuição de Rating")
