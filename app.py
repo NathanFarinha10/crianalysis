@@ -9,6 +9,7 @@ import datetime
 import google.generativeai as genai
 from fpdf import FPDF
 import os
+from io import BytesIO
 
 # ==============================================================================
 # INICIALIZAÇÃO E FUNÇÕES AUXILIARES
@@ -126,10 +127,9 @@ def ajustar_rating(rating_base, notches):
         return escala[idx_final]
     except (ValueError, TypeError): return rating_base
 
-# SUBSTITUA a classe PDF inteira por esta
+# SUBSTITUA a classe PDF inteira por esta (sem alterações, mas para garantir consistência)
 class PDF(FPDF):
     def header(self):
-        # Tenta adicionar o logo, mas continua se não o encontrar
         logo_path = 'assets/seu_logo.png'
         if os.path.exists(logo_path):
             self.image(logo_path, x=10, y=8, w=33)
@@ -139,27 +139,27 @@ class PDF(FPDF):
             self.cell(0, 10, "[Logo não encontrado em assets/seu_logo.png]", 0, 0)
 
         self.set_font('Arial', 'B', 15)
-        self.cell(80) # Move para a direita
-        self.cell(30, 10, 'Relatório de Análise e Rating de CRI', 0, 0, 'C') # Título
-        self.ln(20) # Quebra de linha
+        self.cell(80)
+        self.cell(30, 10, 'Relatório de Análise e Rating de CRI', 0, 0, 'C')
+        self.ln(20)
 
     def footer(self):
         self.set_y(-15)
         self.set_font('Arial', 'I', 8)
-        self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C') # Número da página
+        self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
 
-# SUBSTITUA a função gerar_relatorio_pdf inteira por esta
+# SUBSTITUA a função gerar_relatorio_pdf inteira por esta NOVA versão
 def gerar_relatorio_pdf(ss):
     """
     Gera um relatório completo em PDF com base nos dados do session_state.
-    Versão robusta com tratamento de erros.
+    Versão robusta com tratamento de erros e geração via buffer de memória.
     """
     try:
         pdf = PDF()
         pdf.add_page()
         pdf.set_font('Arial', '', 12)
         
-        # Monta o conteúdo do relatório em HTML
+        # Coleta e formatação dos dados (lógica existente)
         score_final_ponderado = sum(ss.scores.get(p, 1) * w for p, w in {'pilar1': 0.2, 'pilar2': 0.3, 'pilar3': 0.3, 'pilar4': 0.2}.items())
         rating_indicado = converter_score_para_rating(score_final_ponderado)
         rating_final_senior = ajustar_rating(rating_indicado, ss.ajuste_final)
@@ -167,22 +167,21 @@ def gerar_relatorio_pdf(ss):
         html = f"""
         <h1>Relatório de Análise - CRI {ss.op_nome}</h1>
         <hr>
-        
         <h2>1. Dados Cadastrais da Operação</h2>
         <table border="1" width="100%">
             <tr><td width="25%"><b>Nome da Operação:</b></td><td width="75%">{ss.op_nome}</td></tr>
-            <tr><td><b>Código de Negociação:</b></td><td>{ss.op_codigo}</td></tr>
-            <tr><td><b>Volume Emitido:</b></td><td>R$ {ss.op_volume:,.2f}</td></tr>
+            <tr><td><b>Código:</b></td><td>{ss.op_codigo}</td></tr>
+            <tr><td><b>Volume:</b></td><td>R$ {ss.op_volume:,.2f}</td></tr>
             <tr><td><b>Taxa:</b></td><td>{ss.op_indexador} {ss.op_taxa}% a.a.</td></tr>
-            <tr><td><b>Data de Emissão:</b></td><td>{ss.op_data_emissao.strftime('%d/%m/%Y')}</td></tr>
-            <tr><td><b>Data de Vencimento:</b></td><td>{ss.op_data_vencimento.strftime('%d/%m/%Y')}</td></tr>
+            <tr><td><b>Emissão:</b></td><td>{ss.op_data_emissao.strftime('%d/%m/%Y')}</td></tr>
+            <tr><td><b>Vencimento:</b></td><td>{ss.op_data_vencimento.strftime('%d/%m/%Y')}</td></tr>
             <tr><td><b>Securitizadora:</b></td><td>{ss.op_securitizadora}</td></tr>
             <tr><td><b>Originador:</b></td><td>{ss.op_originador}</td></tr>
         </table>
 
         <h2>2. Scorecard e Rating Final</h2>
         <table border="1" width="100%">
-             <thead><tr><th>Componente</th><th>Peso</th><th>Pontuação (1-5)</th><th>Score Ponderado</th></tr></thead>
+            <thead><tr><th>Componente</th><th>Peso</th><th>Pontuação (1-5)</th><th>Score Ponderado</th></tr></thead>
             <tbody>
                 <tr><td>Pilar 1: Originador/Devedor</td><td align="center">20%</td><td align="center">{ss.scores.get('pilar1', 0):.2f}</td><td align="center">{ss.scores.get('pilar1', 0) * 0.2:.2f}</td></tr>
                 <tr><td>Pilar 2: Lastro</td><td align="center">30%</td><td align="center">{ss.scores.get('pilar2', 0):.2f}</td><td align="center">{ss.scores.get('pilar2', 0) * 0.3:.2f}</td></tr>
@@ -196,7 +195,6 @@ def gerar_relatorio_pdf(ss):
         
         <h2>3. Análise Qualitativa com IA Gemini</h2>
         """
-        
         def format_ia_analysis(text):
             return text.replace('**', '<b>').replace('*', '<br>- ').replace('\n', '<br>')
 
@@ -204,11 +202,18 @@ def gerar_relatorio_pdf(ss):
         if ss.get('analise_p2'): html += f"<h3>Análise do Pilar 2: Lastro</h3><p>{format_ia_analysis(ss.analise_p2)}</p>"
         if ss.get('analise_p3'): html += f"<h3>Análise do Pilar 3: Estrutura</h3><p>{format_ia_analysis(ss.analise_p3)}</p>"
         if ss.get('analise_p4'): html += f"<h3>Análise do Pilar 4: Governança</h3><p>{format_ia_analysis(ss.analise_p4)}</p>"
-            
+        
         pdf.write_html(html)
         
-        return pdf.output(dest='S')
-    
+        # --- NOVA LÓGICA DE GERAÇÃO ---
+        # Cria um buffer de bytes na memória
+        buffer = BytesIO()
+        # Salva o PDF no buffer
+        pdf.output(buffer)
+        # Retorna o conteúdo do buffer
+        return buffer.getvalue()
+        # --- FIM DA NOVA LÓGICA ---
+
     except Exception as e:
         st.error(f"Ocorreu um erro inesperado ao gerar o PDF: {e}")
         return b'' # Retorna bytes vazios em caso de qualquer erro
