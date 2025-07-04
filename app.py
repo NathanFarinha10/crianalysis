@@ -454,8 +454,17 @@ def run_cashflow_simulation(cenario_premissas, saldo_lastro, saldo_cri_p5, taxa_
 # CORPO PRINCIPAL DA APLICAÇÃO
 # ==============================================================================
 st.set_page_config(layout="wide", page_title="Análise e Rating de CRI")
-st.title("Plataforma de Análise e Rating de CRI")
-st.markdown("Desenvolvido em parceria com a IA 'Projeto de Análise e Rating de CRI v2'")
+col1, col2 = st.columns([1, 5], gap="medium") # Cria duas colunas, a segunda é 5x mais larga
+
+with col1:
+    # Substitua "assets/seu_logo.png" pelo caminho correto do seu arquivo de imagem
+    st.image("assets/seu_logo.png", width=120) 
+
+with col2:
+    st.title("Plataforma de Análise e Rating de CRI")
+    st.markdown("Desenvolvido em parceria com a IA 'Projeto de Análise e Rating de CRI v2'")
+
+st.divider() # Adiciona uma linha divisória para um visual mais limpo
 
 inicializar_session_state()
 
