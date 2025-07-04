@@ -561,6 +561,17 @@ with tab2:
             st.session_state.scores['pilar2'] = calcular_score_lastro_projeto()
             st.session_state.map_data = get_coords(st.session_state.cidade_mapa)
             st.plotly_chart(create_gauge_chart(st.session_state.scores['pilar2'], "Score Ponderado (Pilar 2)"), use_container_width=True)
+    st.markdown("---")
+    st.subheader("Painel de Indicadores-Chave (Projeto)")
+    kpi1, kpi2, kpi3 = st.columns(3)
+    kpi1.metric("IVV (Velocidade de Vendas)", f"{st.session_state.get('ivv_calculado', 0):.2f}%")
+    kpi2.metric("Avanço Físico da Obra", f"{st.session_state.avanco_fisico_obra}%")
+    kpi3.metric("Situação do Cronograma", st.session_state.cronograma)
+        
+    # Bloco para exibir o mapa
+    if st.session_state.get('map_data') is not None:
+            st.map(st.session_state.map_data, zoom=11)
+            st.caption(f"Localização aproximada de {st.session_state.cidade_mapa}")
     else:
         with st.expander("Fator 1: Qualidade da Carteira (Peso: 40%)", expanded=True):
             c1, c2, c3 = st.columns(3)
