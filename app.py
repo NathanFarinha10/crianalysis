@@ -127,154 +127,93 @@ def ajustar_rating(rating_base, notches):
         return escala[idx_final]
     except (ValueError, TypeError): return rating_base
 
-# SUBSTITUA a classe PDF e a função gerar_relatorio_pdf inteiras por este bloco
-
+# SUBSTITUA a classe PDF inteira por esta
 class PDF(FPDF):
     def header(self):
+        # Tenta adicionar o logo, mas continua se não o encontrar
         logo_path = 'assets/seu_logo.png'
         if os.path.exists(logo_path):
             self.image(logo_path, x=10, y=8, w=33)
         else:
             self.set_xy(10, 10)
             self.set_font('Arial', 'I', 8)
-            self.cell(0, 10, "[Logo não encontrado]", 0, 0)
+            self.cell(0, 10, "[Logo não encontrado em assets/seu_logo.png]", 0, 0)
+
         self.set_font('Arial', 'B', 15)
-        self.cell(0, 10, 'Relatório de Análise e Rating de CRI', 0, 0, 'C')
-        self.ln(20)
+        self.cell(80) # Move para a direita
+        self.cell(30, 10, 'Relatório de Análise e Rating de CRI', 0, 0, 'C') # Título
+        self.ln(20) # Quebra de linha
 
     def footer(self):
         self.set_y(-15)
         self.set_font('Arial', 'I', 8)
-        self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
+        self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C') # Número da página
 
-    def chapter_title(self, title):
-        self.set_font('Arial', 'B', 14)
-        self.cell(0, 10, title, 0, 1, 'L')
-        self.ln(4)
-
-    def chapter_body(self, content):
-        self.set_font('Arial', '', 12)
-        self.multi_cell(0, 10, content)
-        self.ln()
-
-    def TabelaCadastro(self, ss):
-        self.set_font('Arial', '', 10)
-        line_height = self.font_size * 2
-        col_width = self.epw / 4  # Effective page width / 4 columns
-        
-        data = [
-            ("Nome da Operação:", ss.op_nome, "Código:", ss.op_codigo),
-            ("Volume Emitido:", f"R$ {ss.op_volume:,.2f}", "Taxa:", f"{ss.op_indexador} {ss.op_taxa}% a.a."),
-            ("Data de Emissão:", ss.op_data_emissao.strftime('%d/%m/%Y'), "Vencimento:", ss.op_data_vencimento.strftime('%d/%m/%Y')),
-            ("Securitizadora:", ss.op_securitizadora, "Originador:", ss.op_originador),
-        ]
-
-        for row in data:
-            self.set_font('Arial', 'B', 10)
-            self.cell(col_width, line_height, row[0], border=1)
-            self.set_font('Arial', '', 10)
-            self.cell(col_width, line_height, row[1], border=1)
-            self.set_font('Arial', 'B', 10)
-            self.cell(col_width, line_height, row[2], border=1)
-            self.set_font('Arial', '', 10)
-            self.cell(col_width, line_height, row[3], border=1)
-            self.ln(line_height)
-        self.ln(10)
-
-    def TabelaScorecard(self, ss):
-        self.set_font('Arial', 'B', 10)
-        line_height = self.font_size * 2
-        col_widths = [self.epw * 0.5, self.epw * 0.15, self.epw * 0.2, self.epw * 0.15]
-        
-        # Cabeçalho
-        self.cell(col_widths[0], line_height, "Componente", border=1, align='C')
-        self.cell(col_widths[1], line_height, "Peso", border=1, align='C')
-        self.cell(col_widths[2], line_height, "Pontuação (1-5)", border=1, align='C')
-        self.cell(col_widths[3], line_height, "Score Ponderado", border=1, align='C')
-        self.ln(line_height)
-
-        # Dados
-        self.set_font('Arial', '', 10)
-        data = [
-            ["Pilar 1: Originador/Devedor", "20%", f"{ss.scores.get('pilar1', 0):.2f}", f"{ss.scores.get('pilar1', 0) * 0.2:.2f}"],
-            ["Pilar 2: Lastro", "30%", f"{ss.scores.get('pilar2', 0):.2f}", f"{ss.scores.get('pilar2', 0) * 0.3:.2f}"],
-            ["Pilar 3: Estrutura", "30%", f"{ss.scores.get('pilar3', 0):.2f}", f"{ss.scores.get('pilar3', 0) * 0.3:.2f}"],
-            ["Pilar 4: Governança", "20%", f"{ss.scores.get('pilar4', 0):.2f}", f"{ss.scores.get('pilar4', 0) * 0.2:.2f}"],
-        ]
-        for row in data:
-            self.cell(col_widths[0], line_height, row[0], border=1)
-            self.cell(col_widths[1], line_height, row[1], border=1, align='C')
-            self.cell(col_widths[2], line_height, row[2], border=1, align='C')
-            self.cell(col_widths[3], line_height, row[3], border=1, align='C')
-            self.ln(line_height)
-        self.ln(10)
-
-    def AnaliseIA(self, texto_analise):
-        self.set_font('Arial', '', 10)
-        # Processa o markdown simples da IA
-        for line in texto_analise.split('\n'):
-            if line.startswith('**'):
-                self.set_font('Arial', 'B', 10)
-                self.multi_cell(0, 5, line.replace('**', ''))
-                self.set_font('Arial', '', 10)
-            elif line.strip().startswith('* '):
-                self.multi_cell(0, 5, f"  - {line.strip().replace('* ', '')}")
-            else:
-                self.multi_cell(0, 5, line)
-        self.ln(5)
-
-
+# SUBSTITUA a função gerar_relatorio_pdf inteira por esta
 def gerar_relatorio_pdf(ss):
     """
-    Gera um relatório completo em PDF de forma nativa com FPDF2.
+    Gera um relatório completo em PDF com base nos dados do session_state.
+    Versão robusta com tratamento de erros.
     """
     try:
         pdf = PDF()
         pdf.add_page()
-
-        # Seção 1: Dados Cadastrais
-        pdf.chapter_title('1. Dados Cadastrais da Operação')
-        pdf.TabelaCadastro(ss)
+        pdf.set_font('Arial', '', 12)
         
-        # Seção 2: Scorecard e Rating Final
-        pdf.chapter_title('2. Scorecard e Rating Final')
-        pdf.TabelaScorecard(ss)
-
+        # Monta o conteúdo do relatório em HTML
         score_final_ponderado = sum(ss.scores.get(p, 1) * w for p, w in {'pilar1': 0.2, 'pilar2': 0.3, 'pilar3': 0.3, 'pilar4': 0.2}.items())
         rating_indicado = converter_score_para_rating(score_final_ponderado)
         rating_final_senior = ajustar_rating(rating_indicado, ss.ajuste_final)
-
-        pdf.set_font('Arial', 'B', 12)
-        pdf.cell(0, 10, f"Score Final Ponderado: {score_final_ponderado:.2f}", 0, 1)
-        pdf.cell(0, 10, f"Rating Final (Série Sênior): {rating_final_senior}", 0, 1)
-        pdf.set_font('Arial', 'B', 10)
-        pdf.multi_cell(0, 10, f"Justificativa do Comitê: {ss.justificativa_final}")
-        pdf.ln(10)
         
-        # Seção 3: Análise Qualitativa com IA
-        pdf.chapter_title('3. Análise Qualitativa com IA Gemini')
-        if ss.get('analise_p1'):
-            pdf.set_font('Arial', 'B', 12)
-            pdf.cell(0, 10, "Análise do Pilar 1: Originador", 0, 1)
-            pdf.AnaliseIA(ss.analise_p1)
-        if ss.get('analise_p2'):
-            pdf.set_font('Arial', 'B', 12)
-            pdf.cell(0, 10, "Análise do Pilar 2: Lastro", 0, 1)
-            pdf.AnaliseIA(ss.analise_p2)
-        if ss.get('analise_p3'):
-            pdf.set_font('Arial', 'B', 12)
-            pdf.cell(0, 10, "Análise do Pilar 3: Estrutura", 0, 1)
-            pdf.AnaliseIA(ss.analise_p3)
-        if ss.get('analise_p4'):
-            pdf.set_font('Arial', 'B', 12)
-            pdf.cell(0, 10, "Análise do Pilar 4: Governança", 0, 1)
-            pdf.AnaliseIA(ss.analise_p4)
+        html = f"""
+        <h1>Relatório de Análise - CRI {ss.op_nome}</h1>
+        <hr>
+        
+        <h2>1. Dados Cadastrais da Operação</h2>
+        <table border="1" width="100%">
+            <tr><td width="25%"><b>Nome da Operação:</b></td><td width="75%">{ss.op_nome}</td></tr>
+            <tr><td><b>Código de Negociação:</b></td><td>{ss.op_codigo}</td></tr>
+            <tr><td><b>Volume Emitido:</b></td><td>R$ {ss.op_volume:,.2f}</td></tr>
+            <tr><td><b>Taxa:</b></td><td>{ss.op_indexador} {ss.op_taxa}% a.a.</td></tr>
+            <tr><td><b>Data de Emissão:</b></td><td>{ss.op_data_emissao.strftime('%d/%m/%Y')}</td></tr>
+            <tr><td><b>Data de Vencimento:</b></td><td>{ss.op_data_vencimento.strftime('%d/%m/%Y')}</td></tr>
+            <tr><td><b>Securitizadora:</b></td><td>{ss.op_securitizadora}</td></tr>
+            <tr><td><b>Originador:</b></td><td>{ss.op_originador}</td></tr>
+        </table>
 
+        <h2>2. Scorecard e Rating Final</h2>
+        <table border="1" width="100%">
+             <thead><tr><th>Componente</th><th>Peso</th><th>Pontuação (1-5)</th><th>Score Ponderado</th></tr></thead>
+            <tbody>
+                <tr><td>Pilar 1: Originador/Devedor</td><td align="center">20%</td><td align="center">{ss.scores.get('pilar1', 0):.2f}</td><td align="center">{ss.scores.get('pilar1', 0) * 0.2:.2f}</td></tr>
+                <tr><td>Pilar 2: Lastro</td><td align="center">30%</td><td align="center">{ss.scores.get('pilar2', 0):.2f}</td><td align="center">{ss.scores.get('pilar2', 0) * 0.3:.2f}</td></tr>
+                <tr><td>Pilar 3: Estrutura</td><td align="center">30%</td><td align="center">{ss.scores.get('pilar3', 0):.2f}</td><td align="center">{ss.scores.get('pilar3', 0) * 0.3:.2f}</td></tr>
+                <tr><td>Pilar 4: Governança</td><td align="center">20%</td><td align="center">{ss.scores.get('pilar4', 0):.2f}</td><td align="center">{ss.scores.get('pilar4', 0) * 0.2:.2f}</td></tr>
+            </tbody>
+        </table><br>
+        <h3>Score Final Ponderado: {score_final_ponderado:.2f}</h3>
+        <h3>Rating Final (Série Sênior): {rating_final_senior}</h3>
+        <p><b>Justificativa do Comitê:</b> {ss.justificativa_final}</p><hr>
+        
+        <h2>3. Análise Qualitativa com IA Gemini</h2>
+        """
+        
+        def format_ia_analysis(text):
+            return text.replace('**', '<b>').replace('*', '<br>- ').replace('\n', '<br>')
+
+        if ss.get('analise_p1'): html += f"<h3>Análise do Pilar 1: Originador</h3><p>{format_ia_analysis(ss.analise_p1)}</p>"
+        if ss.get('analise_p2'): html += f"<h3>Análise do Pilar 2: Lastro</h3><p>{format_ia_analysis(ss.analise_p2)}</p>"
+        if ss.get('analise_p3'): html += f"<h3>Análise do Pilar 3: Estrutura</h3><p>{format_ia_analysis(ss.analise_p3)}</p>"
+        if ss.get('analise_p4'): html += f"<h3>Análise do Pilar 4: Governança</h3><p>{format_ia_analysis(ss.analise_p4)}</p>"
+            
+        pdf.write_html(html)
+        
         return pdf.output(dest='S')
     
     except Exception as e:
         st.error(f"Ocorreu um erro inesperado ao gerar o PDF: {e}")
-        return b''
+        return b'' # Retorna bytes vazios em caso de qualquer erro
+        
 # ==============================================================================
 # FUNÇÕES DE CÁLCULO DE SCORE (LÓGICA INVERTIDA: 5 = MELHOR, 1 = PIOR)
 # ==============================================================================
