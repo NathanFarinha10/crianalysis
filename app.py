@@ -649,13 +649,13 @@ with tab1:
             st.checkbox("Política de crédito formalizada?", key='politica_formalizada')
    # SUBSTITUA o expander "Fator 3" inteiro por este:
 
-with st.expander("Fator 3: Saúde Financeira (Peso: 40%)"):
-    st.radio("Modalidade de análise:", 
+    with st.expander("Fator 3: Saúde Financeira (Peso: 40%)"):
+        st.radio("Modalidade de análise:", 
              ('Análise Corporativa (Holding/Incorporadora)', 'Análise de Projeto (SPE)'), 
              key='modalidade_financeira', 
              horizontal=True)
     
-    st.markdown("---")
+        st.markdown("---")
 
     if st.session_state.modalidade_financeira == 'Análise Corporativa (Holding/Incorporadora)':
         c1, c2, c3 = st.columns(3)
