@@ -229,7 +229,7 @@ def gerar_relatorio_pdf(ss):
     pdf.write_html(html)
     
     # 3. Retorna o PDF como bytes para o botão de download
-    return pdf.output(dest='S').encode('latin-1')
+    return pdf.output(dest='S')
 
 # ==============================================================================
 # FUNÇÕES DE CÁLCULO DE SCORE (LÓGICA INVERTIDA: 5 = MELHOR, 1 = PIOR)
