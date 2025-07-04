@@ -647,8 +647,44 @@ with tab1:
             st.selectbox("Histórico de entrega de projetos:", ["Consistente e previsível", "Desvios esporádicos", "Atrasos e estouros recorrentes"], key='track_record')
             st.selectbox("Análise de crédito para recebíveis:", ["Score de crédito, análise de renda (DTI) e garantias", "Apenas análise de renda e garantias", "Análise simplificada ou ad-hoc"], key='analise_credito')
             st.checkbox("Política de crédito formalizada?", key='politica_formalizada')
-    with st.expander("Fator 3: Saúde Financeira (Peso: 40%)"):
-        st.radio("Modalidade de análise:", ('Análise Corporativa (Holding/Incorporadora)', 'Análise de Projeto (SPE)'), key='modalidade_financeira', horizontal=True)
+   # SUBSTITUA o expander "Fator 3" inteiro por este:
+
+with st.expander("Fator 3: Saúde Financeira (Peso: 40%)"):
+    st.radio("Modalidade de análise:", 
+             ('Análise Corporativa (Holding/Incorporadora)', 'Análise de Projeto (SPE)'), 
+             key='modalidade_financeira', 
+             horizontal=True)
+    
+    st.markdown("---")
+
+    if st.session_state.modalidade_financeira == 'Análise Corporativa (Holding/Incorporadora)':
+        c1, c2, c3 = st.columns(3)
+        with c1: st.number_input("Dívida Líquida / EBITDA", key='dl_ebitda', help="Mede a alavancagem. Idealmente abaixo de 3.0x para o setor.")
+        with c2: st.number_input("Liquidez Corrente", key='liq_corrente', help="Mede a capacidade de pagar dívidas de curto prazo. Idealmente acima de 1.2.")
+        with c3: st.number_input("FCO / Dívida Total (%)", key='fco_divida', help="Capacidade de pagar a dívida com o caixa gerado. Idealmente acima de 15-20%.")
+        
+        st.markdown("##### Visualização dos Indicadores Corporativos")
+        df_chart = pd.DataFrame({"Valor": [st.session_state.dl_ebitda, st.session_state.liq_corrente], "Benchmark Ruim": [5.0, 0.8], "Benchmark Bom": [2.0, 1.5]}, index=["Dívida/EBITDA", "Liq. Corrente"])
+        st.bar_chart(df_chart)
+
+    else: # Análise de Projeto (SPE)
+        c1, c2 = st.columns(2)
+        with c1:
+            st.number_input("Dívida Total do Projeto (R$)", key='divida_projeto')
+            st.number_input("Custo Remanescente da Obra (R$)", key='custo_remanescente')
+            st.number_input("VGV já Vendido (R$)", key='vgv_vendido')
+        with c2:
+            st.number_input("VGV Total do Projeto (R$)", key='vgv_projeto')
+            st.number_input("Recursos Disponíveis para Obra (Caixa + CRI) (R$)", key='recursos_obra')
+            st.number_input("Saldo Devedor do CRI (R$)", key='sd_cri')
+
+        st.markdown("##### Visualização dos Indicadores do Projeto")
+        custo_rem = st.session_state.custo_remanescente
+        sd_cri = st.session_state.sd_cri
+        cobertura_obra_perc = (st.session_state.recursos_obra / custo_rem) if custo_rem > 0 else 0
+        cobertura_vendas_perc = (st.session_state.vgv_vendido / sd_cri) if sd_cri > 0 else 0
+        st.progress(min(cobertura_obra_perc, 1.0), text=f"Cobertura de Custo da Obra: {cobertura_obra_perc:.1%}")
+        st.progress(min(cobertura_vendas_perc, 1.0), text=f"Cobertura da Dívida por Vendas: {cobertura_vendas_perc:.1%}")
     if st.button("Calcular Score do Pilar 1", use_container_width=True):
         st.session_state.scores['pilar1'] = (calcular_score_governanca() * 0.3) + (calcular_score_operacional() * 0.3) + (calcular_score_financeiro() * 0.4)
         st.plotly_chart(create_gauge_chart(st.session_state.scores['pilar1'], "Score Ponderado (Pilar 1)"), use_container_width=True)
@@ -661,10 +697,14 @@ with tab1:
     if "analise_p1" in st.session_state:
         with st.container(border=True): st.markdown(st.session_state.analise_p1)
 
+# SUBSTITUA o conteúdo da aba 2 inteira por este:
+
 with tab2:
     st.header("Pilar 2: Análise do Lastro")
     st.markdown("Peso no Scorecard Mestre: **30%**")
     st.radio("Selecione a natureza do lastro:",('Desenvolvimento Imobiliário (Risco de Projeto)', 'Carteira de Recebíveis (Risco de Crédito)'), key="tipo_lastro", horizontal=True)
+    st.divider()
+
     if st.session_state.tipo_lastro == 'Desenvolvimento Imobiliário (Risco de Projeto)':
         with st.expander("Fator 1: Viabilidade de Mercado (Peso: 25%)", expanded=True):
             c1, c2 = st.columns(2)
@@ -674,6 +714,7 @@ with tab2:
             with c2:
                 st.selectbox("Qualidade da Microlocalização:", ["Nobre / Premium", "Boa", "Regular", "Periférica / Risco"], key='microlocalizacao')
                 st.text_input("Cidade/Estado para Mapa:", key='cidade_mapa', help="Ex: 'Rio de Janeiro, RJ'.")
+        
         with st.expander("Fator 2: Performance Comercial (Peso: 40%)"):
             c1, c2, c3 = st.columns(3)
             with c1: st.number_input("Unidades Vendidas no Último Mês:", min_value=0, key='unidades_vendidas_mes')
@@ -683,27 +724,29 @@ with tab2:
                 ivv_calculado = (st.session_state.unidades_vendidas_mes / unid_ofertadas) * 100 if unid_ofertadas > 0 else 0
                 st.metric("IVV Calculado", f"{ivv_calculado:.2f}%")
             st.slider("Percentual do VGV total já vendido (%)", 0, 100, key='vgv_vendido_perc')
+
         with st.expander("Fator 3: Risco de Execução (Peso: 35%)"):
             st.slider("Avanço Físico da Obra (%)", 0, 100, key='avanco_fisico_obra')
             st.selectbox("Aderência ao cronograma:", ["Adiantado ou no prazo", "Atraso leve (< 3 meses)", "Atraso significativo (3-6 meses)", "Atraso severo (> 6 meses)"], key='cronograma')
             st.selectbox("Aderência ao orçamento:", ["Dentro do orçamento", "Estouro leve (<5%)", "Estouro moderado (5-10%)", "Estouro severo (>10%)"], key='orcamento')
             st.selectbox("Suficiência do Fundo de Obras:", ["Suficiente com margem (>110%)", "Suficiente (100-110%)", "Insuficiente (<100%)"], key='fundo_obras')
+
         if st.button("Calcular Score e Mapa do Pilar 2 (Projeto)", use_container_width=True):
             st.session_state.scores['pilar2'] = calcular_score_lastro_projeto()
             st.session_state.map_data = get_coords(st.session_state.cidade_mapa)
             st.plotly_chart(create_gauge_chart(st.session_state.scores['pilar2'], "Score Ponderado (Pilar 2)"), use_container_width=True)
-    st.markdown("---")
-    st.subheader("Painel de Indicadores-Chave (Projeto)")
-    kpi1, kpi2, kpi3 = st.columns(3)
-    kpi1.metric("IVV (Velocidade de Vendas)", f"{st.session_state.get('ivv_calculado', 0):.2f}%")
-    kpi2.metric("Avanço Físico da Obra", f"{st.session_state.avanco_fisico_obra}%")
-    kpi3.metric("Situação do Cronograma", st.session_state.cronograma)
-        
-    # Bloco para exibir o mapa
-    if st.session_state.get('map_data') is not None:
+
+        st.markdown("---")
+        st.subheader("Painel de Indicadores-Chave (Projeto)")
+        kpi1, kpi2, kpi3 = st.columns(3)
+        kpi1.metric("IVV (Velocidade de Vendas)", f"{st.session_state.get('ivv_calculado', 0):.2f}%")
+        kpi2.metric("Avanço Físico da Obra", f"{st.session_state.avanco_fisico_obra}%")
+        kpi3.metric("Situação do Cronograma", st.session_state.cronograma)
+        if st.session_state.get('map_data') is not None:
             st.map(st.session_state.map_data, zoom=11)
             st.caption(f"Localização aproximada de {st.session_state.cidade_mapa}")
-    else:
+
+    else: # Carteira de Recebíveis
         with st.expander("Fator 1: Qualidade da Carteira (Peso: 40%)", expanded=True):
             c1, c2, c3 = st.columns(3)
             with c1: st.number_input("Saldo Devedor Total da Carteira (R$)", key='saldo_devedor_carteira')
@@ -713,14 +756,18 @@ with tab2:
                 ltv_calculado = (st.session_state.saldo_devedor_carteira / valor_garantias) * 100 if valor_garantias > 0 else 0
                 st.metric("LTV Médio Calculado", f"{ltv_calculado:.2f}%")
             st.selectbox("Qualidade da política de crédito:", ["Robusta e bem documentada (score, DTI, etc.)", "Padrão de mercado", "Frouxa, ad-hoc ou desconhecida"], key='origem')
+        
         with st.expander("Fator 2: Performance Histórica (Peso: 40%)"):
             st.number_input("Inadimplência da carteira (> 90 dias) (%)", key='inadimplencia')
             st.selectbox("Análise de safras (vintage):", ["Estável ou melhorando", "Com leve deterioração", "Com deterioração clara e preocupante"], key='vintage')
+        
         with st.expander("Fator 3: Concentração (Peso: 20%)"):
             st.number_input("Concentração nos 5 maiores devedores (%)", key='concentracao_top5')
+        
         if st.button("Calcular Score do Pilar 2 (Carteira)", use_container_width=True):
             st.session_state.scores['pilar2'] = calcular_score_lastro_carteira()
             st.plotly_chart(create_gauge_chart(st.session_state.scores['pilar2'], "Score Ponderado (Pilar 2)"), use_container_width=True)
+
     st.divider()
     st.subheader("🤖 Análise com IA Gemini")
     if st.button("Gerar Análise Qualitativa para o Pilar 2", key="ia_pilar2", use_container_width=True):
