@@ -7,6 +7,7 @@ from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
 import datetime
 import google.generativeai as genai
+from fpdf import FPDF
 
 # ==============================================================================
 # INICIALIZAÇÃO E FUNÇÕES AUXILIARES
@@ -123,6 +124,112 @@ def ajustar_rating(rating_base, notches):
         idx_final = max(0, min(len(escala) - 1, idx_base + notches))
         return escala[idx_final]
     except (ValueError, TypeError): return rating_base
+
+class PDF(FPDF):
+    def header(self):
+        # Adiciona o logo
+        # Certifique-se que o caminho 'assets/seu_logo.png' está correto
+        self.image('assets/seu_logo.png', x=10, y=8, w=33)
+        self.set_font('Arial', 'B', 15)
+        # Move para a direita
+        self.cell(80)
+        # Título
+        self.cell(30, 10, 'Relatório de Análise e Rating de CRI', 0, 0, 'C')
+        # Quebra de linha
+        self.ln(20)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font('Arial', 'I', 8)
+        # Número da página
+        self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
+
+def gerar_relatorio_pdf(ss):
+    """
+    Gera um relatório completo em PDF com base nos dados do session_state.
+    """
+    pdf = PDF()
+    pdf.add_page()
+    pdf.set_font('Arial', '', 12)
+    
+    # 1. Monta o conteúdo do relatório em HTML
+    html = f"""
+    <h1>Relatório de Análise - CRI {ss.op_nome}</h1>
+    <hr>
+    
+    <h2>1. Dados Cadastrais da Operação</h2>
+    <table border="1" width="100%">
+        <tr>
+            <td width="25%"><b>Nome da Operação:</b></td><td width="75%">{ss.op_nome}</td>
+        </tr>
+        <tr>
+            <td><b>Código de Negociação:</b></td><td>{ss.op_codigo}</td>
+        </tr>
+        <tr>
+            <td><b>Volume Emitido:</b></td><td>R$ {ss.op_volume:,.2f}</td>
+        </tr>
+        <tr>
+            <td><b>Taxa:</b></td><td>{ss.op_indexador} {ss.op_taxa}% a.a.</td>
+        </tr>
+        <tr>
+            <td><b>Data de Emissão:</b></td><td>{ss.op_data_emissao.strftime('%d/%m/%Y')}</td>
+        </tr>
+        <tr>
+            <td><b>Data de Vencimento:</b></td><td>{ss.op_data_vencimento.strftime('%d/%m/%Y')}</td>
+        </tr>
+        <tr>
+            <td><b>Securitizadora:</b></td><td>{ss.op_securitizadora}</td>
+        </tr>
+        <tr>
+            <td><b>Originador:</b></td><td>{ss.op_originador}</td>
+        </tr>
+    </table>
+
+    <h2>2. Scorecard e Rating Final</h2>
+    <table border="1" width="100%">
+         <thead>
+            <tr>
+                <th>Componente</th><th>Peso</th><th>Pontuação (1-5)</th><th>Score Ponderado</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>Pilar 1: Originador/Devedor</td><td align="center">20%</td><td align="center">{ss.scores.get('pilar1', 0):.2f}</td><td align="center">{ss.scores.get('pilar1', 0) * 0.2:.2f}</td></tr>
+            <tr><td>Pilar 2: Lastro</td><td align="center">30%</td><td align="center">{ss.scores.get('pilar2', 0):.2f}</td><td align="center">{ss.scores.get('pilar2', 0) * 0.3:.2f}</td></tr>
+            <tr><td>Pilar 3: Estrutura</td><td align="center">30%</td><td align="center">{ss.scores.get('pilar3', 0):.2f}</td><td align="center">{ss.scores.get('pilar3', 0) * 0.3:.2f}</td></tr>
+            <tr><td>Pilar 4: Governança</td><td align="center">20%</td><td align="center">{ss.scores.get('pilar4', 0):.2f}</td><td align="center">{ss.scores.get('pilar4', 0) * 0.2:.2f}</td></tr>
+        </tbody>
+    </table>
+    <br>
+    """
+    
+    score_final_ponderado = sum(ss.scores.get(p, 1) * w for p, w in {'pilar1': 0.2, 'pilar2': 0.3, 'pilar3': 0.3, 'pilar4': 0.2}.items())
+    rating_indicado = converter_score_para_rating(score_final_ponderado)
+    rating_final_senior = ajustar_rating(rating_indicado, ss.ajuste_final)
+    
+    html += f"""
+    <h3>Score Final Ponderado: {score_final_ponderado:.2f}</h3>
+    <h3>Rating Final (Série Sênior): {rating_final_senior}</h3>
+    <p><b>Justificativa do Comitê:</b> {ss.justificativa_final}</p>
+    <hr>
+    
+    <h2>3. Análise Qualitativa com IA Gemini</h2>
+    """
+    
+    # Adiciona as análises de IA se existirem
+    if ss.get('analise_p1'):
+        html += f"<h3>Análise do Pilar 1: Originador</h3><p>{ss.analise_p1.replace('**', '<b>').replace('*', '<li>')}</p>"
+    if ss.get('analise_p2'):
+        html += f"<h3>Análise do Pilar 2: Lastro</h3><p>{ss.analise_p2.replace('**', '<b>').replace('*', '<li>')}</p>"
+    if ss.get('analise_p3'):
+        html += f"<h3>Análise do Pilar 3: Estrutura</h3><p>{ss.analise_p3.replace('**', '<b>').replace('*', '<li>')}</p>"
+    if ss.get('analise_p4'):
+        html += f"<h3>Análise do Pilar 4: Governança</h3><p>{ss.analise_p4.replace('**', '<b>').replace('*', '<li>')}</p>"
+        
+    # 2. Escreve o HTML no PDF
+    pdf.write_html(html)
+    
+    # 3. Retorna o PDF como bytes para o botão de download
+    return pdf.output(dest='S').encode('latin-1')
 
 # ==============================================================================
 # FUNÇÕES DE CÁLCULO DE SCORE (LÓGICA INVERTIDA: 5 = MELHOR, 1 = PIOR)
@@ -827,3 +934,21 @@ with tab6:
                 st.metric("Rating Indicativo (Subordinada)", value="Não Aplicável")
         with col2:
             st.text_area("Justificativa e comentários finais:", height=250, key='justificativa_final')
+
+    st.divider()
+    st.subheader("⬇️ Download do Relatório")
+    
+    # Verifica se os scores foram calculados para habilitar o botão
+    if 'pilar4' in st.session_state.scores:
+        # Chama a função para gerar os dados do PDF
+        pdf_data = gerar_relatorio_pdf(st.session_state)
+        
+        st.download_button(
+            label="Baixar Relatório em PDF",
+            data=pdf_data,
+            file_name=f"Relatorio_CRI_{st.session_state.op_nome.replace(' ', '_')}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
+    else:
+        st.warning("Calcule todos os pilares para habilitar o download do relatório.")
