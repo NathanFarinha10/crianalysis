@@ -127,15 +127,15 @@ def ajustar_rating(rating_base, notches):
         return escala[idx_final]
     except (ValueError, TypeError): return rating_base
 
-# SUBSTITUA a classe PDF inteira por esta
+# SUBSTITUA a classe PDF inteira por esta versão mais robusta
 class PDF(FPDF):
     def header(self):
         logo_path = 'assets/seu_logo.png'
-        if os.path.exists(logo_path):
-            self.image(logo_path, x=10, y=8, w=33)
-        else:
-            self.set_xy(10, 10)
-            self.set_font('Arial', 'I', 8)
+        try:
+            if os.path.exists(logo_path):
+                self.image(logo_path, x=10, y=8, w=33)
+        except Exception:
+            self.set_xy(10, 10); self.set_font('Arial', 'I', 8)
             self.cell(0, 10, "[Logo não encontrado]", 0, 0)
         
         self.set_font('Arial', 'B', 15)
@@ -147,20 +147,19 @@ class PDF(FPDF):
         self.set_font('Arial', 'I', 8)
         self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
 
+    def _write_text(self, text):
+        # Função interna para lidar com a codificação de qualquer texto
+        return text.encode('latin-1', 'replace').decode('latin-1')
+
     def chapter_title(self, title):
         self.set_font('Arial', 'B', 14)
-        self.multi_cell(0, 10, title.encode('latin-1', 'replace').decode('latin-1'), 0, 'L')
+        self.multi_cell(0, 10, self._write_text(title), 0, 'L')
         self.ln(4)
-
-    def chapter_body(self, content):
-        self.set_font('Arial', '', 12)
-        self.multi_cell(0, 10, content.encode('latin-1', 'replace').decode('latin-1'))
-        self.ln()
 
     def TabelaCadastro(self, ss):
         self.set_font('Arial', '', 10)
         line_height = self.font_size * 1.5
-        col_width = self.epw / 4
+        col_width = self.epw / 4 
         
         data = {
             "Nome da Operação:": ss.op_nome, "Código:": ss.op_codigo,
@@ -172,14 +171,14 @@ class PDF(FPDF):
         for i, (label, value) in enumerate(data.items()):
             if i % 2 == 0:
                 self.set_font('Arial', 'B', 10)
-                self.cell(col_width, line_height, label, border=1)
+                self.cell(col_width, line_height, self._write_text(label), border=1)
                 self.set_font('Arial', '', 10)
-                self.cell(col_width, line_height, value.encode('latin-1', 'replace').decode('latin-1'), border=1)
+                self.cell(col_width, line_height, self._write_text(str(value)), border=1)
             else:
                 self.set_font('Arial', 'B', 10)
-                self.cell(col_width, line_height, label, border=1)
+                self.cell(col_width, line_height, self._write_text(label), border=1)
                 self.set_font('Arial', '', 10)
-                self.cell(col_width, line_height, value.encode('latin-1', 'replace').decode('latin-1'), border=1)
+                self.cell(col_width, line_height, self._write_text(str(value)), border=1)
                 self.ln(line_height)
         self.ln(10)
 
@@ -209,23 +208,26 @@ class PDF(FPDF):
     def AnaliseIA(self, texto_analise):
         self.set_font('Arial', '', 10)
         for line in texto_analise.split('\n'):
-            line_encoded = line.encode('latin-1', 'replace').decode('latin-1')
             if line.startswith('**'):
                 self.set_font('Arial', 'B', 10)
-                self.multi_cell(0, 5, line_encoded.replace('**', ''))
+                self.multi_cell(0, 5, self._write_text(line.replace('**', '')))
                 self.set_font('Arial', '', 10)
             elif line.strip().startswith('* '):
-                self.multi_cell(0, 5, f"  - {line_encoded.strip().replace('* ', '')}")
+                self.multi_cell(0, 5, self._write_text(f"  - {line.strip().replace('* ', '')}"))
             else:
-                self.multi_cell(0, 5, line_encoded)
+                self.multi_cell(0, 5, self._write_text(line))
         self.ln(5)
 
 def gerar_relatorio_pdf(ss):
     try:
         pdf = PDF()
         pdf.add_page()
+        
+        # Seção 1: Dados Cadastrais
         pdf.chapter_title('1. Dados Cadastrais da Operação')
         pdf.TabelaCadastro(ss)
+        
+        # Seção 2: Scorecard e Rating Final
         pdf.chapter_title('2. Scorecard e Rating Final')
         pdf.TabelaScorecard(ss)
         
@@ -237,31 +239,27 @@ def gerar_relatorio_pdf(ss):
         pdf.cell(0, 10, f"Score Final Ponderado: {score_final_ponderado:.2f}", 0, 1)
         pdf.cell(0, 10, f"Rating Final (Série Sênior): {rating_final_senior}", 0, 1)
         pdf.set_font('Arial', 'B', 10)
-        pdf.multi_cell(0, 10, f"Justificativa do Comitê: {ss.justificativa_final.encode('latin-1', 'replace').decode('latin-1')}")
+        pdf.multi_cell(0, 10, pdf._write_text(f"Justificativa do Comitê: {ss.justificativa_final}"))
         pdf.ln(5)
         
+        # Seção 3: Análise Qualitativa com IA
         pdf.chapter_title('3. Análise Qualitativa com IA Gemini')
-        if ss.get('analise_p1'):
-            pdf.set_font('Arial', 'B', 12)
-            pdf.cell(0, 10, "Análise do Pilar 1: Originador", 0, 1)
-            pdf.AnaliseIA(ss.analise_p1)
-        if ss.get('analise_p2'):
-            pdf.set_font('Arial', 'B', 12)
-            pdf.cell(0, 10, "Análise do Pilar 2: Lastro", 0, 1)
-            pdf.AnaliseIA(ss.analise_p2)
-        if ss.get('analise_p3'):
-            pdf.set_font('Arial', 'B', 12)
-            pdf.cell(0, 10, "Análise do Pilar 3: Estrutura", 0, 1)
-            pdf.AnaliseIA(ss.analise_p3)
-        if ss.get('analise_p4'):
-            pdf.set_font('Arial', 'B', 12)
-            pdf.cell(0, 10, "Análise do Pilar 4: Governança", 0, 1)
-            pdf.AnaliseIA(ss.analise_p4)
+        for i in range(1, 5):
+            pilar_key = f'pilar{i}'
+            analise_key = f'analise_p{i}'
+            nomes_pilares = ["Originador", "Lastro", "Estrutura", "Jurídico e Governança"]
+            if ss.get(analise_key):
+                pdf.set_font('Arial', 'B', 12)
+                pdf.cell(0, 10, f"Análise do Pilar {i}: {nomes_pilares[i-1]}", 0, 1)
+                pdf.AnaliseIA(ss[analise_key])
 
-        return pdf.output(dest='S')
+        # Método de Geração via Buffer de Memória
+        buffer = BytesIO()
+        pdf_bytes = pdf.output(buffer)
+        return buffer.getvalue()
     
     except Exception as e:
-        st.error(f"Ocorreu um erro inesperado ao gerar o PDF: {e}")
+        st.error(f"Ocorreu um erro crítico ao gerar o PDF: {e}")
         return b''
         
 # ==============================================================================
