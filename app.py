@@ -127,30 +127,18 @@ def ajustar_rating(rating_base, notches):
         return escala[idx_final]
     except (ValueError, TypeError): return rating_base
 
-# SUBSTITUA a classe PDF inteira por esta versão corrigida
-
 class PDF(FPDF):
     def header(self):
-        # Tenta adicionar o logo no canto esquerdo
         logo_path = 'assets/seu_logo.png'
         try:
             if os.path.exists(logo_path):
                 self.image(logo_path, x=10, y=8, w=33)
         except Exception:
-            self.set_xy(10, 10)
-            self.set_font('Arial', 'I', 8)
+            self.set_xy(10, 10); self.set_font('Arial', 'I', 8)
             self.cell(0, 10, "[Logo não encontrado]", 0, 0, 'L')
         
-        # Define a fonte para o título
         self.set_font('Arial', 'B', 15)
-        
-        # ---- CORREÇÃO APLICADA AQUI ----
-        # Usa uma célula com largura 0, que significa "toda a largura da página".
-        # O parâmetro align='C' fará o centrado correto automaticamente.
         self.cell(0, 10, 'Relatório de Análise e Rating de CRI', 0, 0, 'C')
-        # ---- FIM DA CORREÇÃO ----
-        
-        # Quebra de linha para o conteúdo começar abaixo do cabeçalho
         self.ln(20)
 
     def footer(self):
@@ -179,27 +167,21 @@ class PDF(FPDF):
         }
         
         for i, (label, value) in enumerate(data.items()):
-            # Correção para garantir que a linha seja quebrada corretamente
-            if i > 0 and i % 2 == 0:
-                self.ln(line_height)
-                
+            if i > 0 and i % 2 == 0: self.ln(line_height)
             self.set_font('Arial', 'B', 10)
             self.cell(col_width, line_height, self._write_text(label), border=1)
             self.set_font('Arial', '', 10)
             self.cell(col_width, line_height, self._write_text(str(value)), border=1)
-        self.ln(line_height) # Quebra de linha final
+        self.ln(line_height)
         self.ln(10)
 
     def TabelaScorecard(self, ss):
         self.set_font('Arial', 'B', 10)
         line_height = self.font_size * 1.5
         col_widths = [self.epw * 0.5, self.epw * 0.15, self.epw * 0.2, self.epw * 0.15]
-        
         headers = ["Componente", "Peso", "Pontuação (1-5)", "Score Ponderado"]
-        for i, header in enumerate(headers):
-            self.cell(col_widths[i], line_height, header, border=1, align='C')
+        for i, header in enumerate(headers): self.cell(col_widths[i], line_height, header, border=1, align='C')
         self.ln(line_height)
-        
         self.set_font('Arial', '', 10)
         data = [
             ["Pilar 1: Originador/Devedor", "20%", f"{ss.scores.get('pilar1', 0):.2f}", f"{ss.scores.get('pilar1', 0) * 0.2:.2f}"],
@@ -208,8 +190,7 @@ class PDF(FPDF):
             ["Pilar 4: Governança", "20%", f"{ss.scores.get('pilar4', 0):.2f}", f"{ss.scores.get('pilar4', 0) * 0.2:.2f}"],
         ]
         for row in data:
-            for i, item in enumerate(row):
-                self.cell(col_widths[i], line_height, item, border=1, align='C')
+            for i, item in enumerate(row): self.cell(col_widths[i], line_height, item, border=1, align='C')
             self.ln(line_height)
         self.ln(10)
 
@@ -226,6 +207,44 @@ class PDF(FPDF):
             else:
                 self.multi_cell(0, 5, line_encoded)
         self.ln(5)
+
+def gerar_relatorio_pdf(ss):
+    try:
+        pdf = PDF()
+        pdf.add_page()
+        pdf.chapter_title('1. Dados Cadastrais da Operação')
+        pdf.TabelaCadastro(ss)
+        pdf.chapter_title('2. Scorecard e Rating Final')
+        pdf.TabelaScorecard(ss)
+        
+        score_final_ponderado = sum(ss.scores.get(p, 1) * w for p, w in {'pilar1': 0.2, 'pilar2': 0.3, 'pilar3': 0.3, 'pilar4': 0.2}.items())
+        rating_indicado = converter_score_para_rating(score_final_ponderado)
+        rating_final_senior = ajustar_rating(rating_indicado, ss.ajuste_final)
+        
+        pdf.set_font('Arial', 'B', 12)
+        pdf.cell(0, 10, f"Score Final Ponderado: {score_final_ponderado:.2f}", 0, 1)
+        pdf.cell(0, 10, f"Rating Final (Série Sênior): {rating_final_senior}", 0, 1)
+        pdf.set_font('Arial', 'B', 10)
+        pdf.multi_cell(0, 10, pdf._write_text(f"Justificativa do Comitê: {ss.justificativa_final}"))
+        pdf.ln(5)
+        
+        pdf.chapter_title('3. Análise Qualitativa com IA Gemini')
+        for i in range(1, 5):
+            pilar_key = f'pilar{i}'
+            analise_key = f'analise_p{i}'
+            nomes_pilares = ["Originador", "Lastro", "Estrutura", "Jurídico e Governança"]
+            if ss.get(analise_key):
+                pdf.set_font('Arial', 'B', 12)
+                pdf.cell(0, 10, f"Análise do Pilar {i}: {nomes_pilares[i-1]}", 0, 1)
+                pdf.AnaliseIA(ss[analise_key])
+
+        buffer = BytesIO()
+        pdf.output(buffer)
+        return buffer.getvalue()
+    
+    except Exception as e:
+        st.error(f"Ocorreu um erro crítico ao gerar o PDF: {e}")
+        return b''
         
 # ==============================================================================
 # FUNÇÕES DE CÁLCULO DE SCORE (LÓGICA INVERTIDA: 5 = MELHOR, 1 = PIOR)
