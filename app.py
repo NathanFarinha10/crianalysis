@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
 import datetime
+import google.generativeai as genai
 
 # ==============================================================================
 # INICIALIZAÇÃO E FUNÇÕES AUXILIARES
@@ -135,6 +136,44 @@ def ajustar_rating(rating_base, notches):
         return escala[idx_final]
     except (ValueError, TypeError):
         return rating_base
+
+@st.cache_data # Cache para evitar chamadas repetidas e custos
+def gerar_analise_ia(nome_pilar, dados_pilar_str):
+    """
+    Envia os dados de um pilar para a API do Gemini e retorna uma análise qualitativa.
+    """
+    # Configura a API Key a partir do st.secrets
+    try:
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    except Exception:
+        return "Erro: A chave da API do Gemini (GEMINI_API_KEY) não foi encontrada nos segredos do Streamlit. Por favor, configure o arquivo `secrets.toml`."
+
+    # Definição do Modelo
+    model = genai.GenerativeModel('gemini-1.5-flash')
+
+    # O cérebro da operação: O Prompt
+    prompt = f"""
+    Aja como um analista de crédito sênior, especialista em operações estruturadas (CRI) no Brasil.
+    Sua tarefa é analisar os dados do pilar '{nome_pilar}' de uma operação de CRI e fornecer uma análise qualitativa concisa.
+
+    Estruture sua resposta em três seções obrigatórias, usando markdown:
+    1.  **Pontos Positivos**: Destaque os fatores que mitigam o risco.
+    2.  **Pontos de Atenção**: Aponte os fatores que representam um risco potencial ou que merecem monitoramento.
+    3.  **Possíveis Incongruências**: Se houver, aponte dados que parecem contraditórios entre si.
+
+    Seja direto e foque nos pontos mais relevantes para um investidor.
+
+    **Dados para Análise:**
+    ---
+    {dados_pilar_str}
+    ---
+    """
+    
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"Ocorreu um erro ao chamar a API do Gemini: {e}"
 
 # ==============================================================================
 # FUNÇÕES DE CÁLCULO DE SCORE (LÓGICA INVERTIDA: 5 = MELHOR, 1 = PIOR)
@@ -687,6 +726,44 @@ with tab1:
             st.markdown("O Score Final deste pilar é uma média ponderada dos scores dos três fatores, com pesos baseados na Tabela 2 da metodologia:")
             st.latex(r'''Score_{P1} = (Score_{Gov} \times 0.3) + (Score_{Op} \times 0.3) + (Score_{Fin} \times 0.4)''')
         st.success("Cálculo do Pilar 1 concluído e salvo na sessão!")
+ 
+    st.divider()
+    st.subheader("🤖 Análise com IA Gemini")
+    
+    if st.button("Gerar Análise Qualitativa para o Pilar 1", key="ia_pilar1", use_container_width=True):
+        # 1. Coletar todos os dados do pilar em um formato de texto legível
+        dados_p1_str = f"""
+        - **Governança e Reputação**:
+            - Histórico de emissões: {st.session_state.hist_emissor}
+            - Experiência dos sócios: {st.session_state.exp_socios}
+            - Histórico pessoal dos sócios: {st.session_state.hist_socios}
+            - Identificação de UBOs: {st.session_state.ubo}
+            - Conselho de Administração: {st.session_state.conselho}
+            - Comitês formais: {'Sim' if st.session_state.comites else 'Não'}
+            - Auditoria por: {st.session_state.auditoria}
+            - Ressalvas na auditoria: {'Sim' if st.session_state.ressalvas else 'Não'}
+            - Políticas de Compliance: {st.session_state.compliance}
+            - Nível de Litígios: {st.session_state.litigios}
+            - Risco Jurídico/Regulatório: {st.session_state.risco_juridico}
+            - Risco Ambiental: {st.session_state.risco_ambiental}
+            - Risco Social/Trabalhista: {st.session_state.risco_social}
+        - **Histórico Operacional**:
+            - Track record de entrega: {st.session_state.track_record}
+            - Reputação com clientes: {st.session_state.reputacao}
+        - **Saúde Financeira ({st.session_state.modalidade_financeira})**:
+            - Dívida Líquida / EBITDA: {st.session_state.dl_ebitda}
+            - Liquidez Corrente: {st.session_state.liq_corrente}
+        """
+        
+        # 2. Chamar a função de backend
+        with st.spinner("Analisando o pilar com a IA... Por favor, aguarde."):
+            analise = gerar_analise_ia("Pilar 1: Originador e Devedor", dados_p1_str)
+            st.session_state.analise_p1 = analise
+    
+    # 3. Exibir o resultado se ele existir na sessão
+    if "analise_p1" in st.session_state:
+        with st.container(border=True):
+            st.markdown(st.session_state.analise_p1)
 
 with tab2:
     st.header("Pilar 2: Análise do Lastro")
