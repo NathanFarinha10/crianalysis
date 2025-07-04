@@ -108,9 +108,9 @@ def create_gauge_chart(score, title):
             'axis': {'range': [1, 5], 'tickwidth': 1, 'tickcolor': "darkblue"},
             'bar': {'color': "black", 'thickness': 0.3}, 'bgcolor': "white", 'borderwidth': 1, 'bordercolor': "gray",
             'steps': [
-                {'range': [1, 2.75], 'color': '#28a745'},
-                {'range': [2.75, 3.5], 'color': '#ffc107'},
-                {'range': [3.5, 5], 'color': '#dc3545'}],
+                {'range': [1, 2.5], 'color': '#dc3545'},   
+                {'range': [2.5, 3.75], 'color': '#ffc107'}, 
+                {'range': [3.75, 5], 'color': '#28a745'}],
         }))
     fig.update_layout(height=250, margin={'t':40, 'b':40, 'l':30, 'r':30})
     return fig
@@ -239,12 +239,12 @@ def gerar_fluxo_projeto(ss):
         
 def converter_score_para_rating(score):
     if score is None: return "N/A"
-    if score <= 1.25: return 'brAAA(sf)'
-    elif score <= 1.75: return 'brAA(sf)'
-    elif score <= 2.25: return 'brA(sf)'
-    elif score <= 2.75: return 'brBBB(sf)'
-    elif score <= 3.25: return 'brBB(sf)'
-    elif score <= 4.00: return 'brB(sf)'
+    if score >= 4.75: return 'brAAA(sf)'
+    elif score >= 4.25: return 'brAA(sf)'
+    elif score >= 3.75: return 'brA(sf)'
+    elif score >= 3.25: return 'brBBB(sf)'
+    elif score >= 2.75: return 'brBB(sf)'
+    elif score >= 2.00: return 'brB(sf)'
     else: return 'brCCC(sf)'
 
 def ajustar_rating(rating_base, notches):
@@ -261,138 +261,140 @@ def ajustar_rating(rating_base, notches):
 # ==============================================================================
 def calcular_score_governanca():
     scores = []
-    # Dicionários de mapeamento
-    map_ubo = {"Sim": 1, "Parcialmente": 3, "Não": 5}
-    map_conselho = {"Independente e atuante": 1, "Majoritariamente independente": 2, "Consultivo/Sem independência": 4, "Inexistente": 5}
-    map_auditoria = {"Big Four": 1, "Auditoria de Grande Porte (fora do Big Four)": 2, "Auditoria de Pequeno Porte/Contador": 4, "Não auditado": 5}
-    map_compliance = {"Maduras e implementadas": 1, "Em desenvolvimento": 3, "Inexistentes ou ad-hoc": 5}
-    map_litigios = {"Inexistente ou irrelevante": 1, "Baixo impacto financeiro": 2, "Médio impacto potencial": 4, "Alto impacto / Risco para a operação": 5}
-    map_emissor = {"Emissor recorrente com bom histórico": 1, "Poucas emissões ou histórico misto": 3, "Primeira emissão": 4, "Histórico negativo": 5}
-    map_socios = {"Altamente experiente e com boa reputação": 1, "Experiência moderada": 3, "Inexperiente ou com reputação questionável": 5}
-    map_risco = {"Baixo / Gerenciado": 1, "Moderado / Pontos de Atenção": 3, "Alto / Risco Relevante": 5}
+    map_ubo = {"Sim": 5, "Parcialmente": 3, "Não": 1}
+    map_conselho = {"Independente e atuante": 5, "Majoritariamente independente": 4, "Consultivo/Sem independência": 2, "Inexistente": 1}
+    map_auditoria = {"Big Four": 5, "Auditoria de Grande Porte (fora do Big Four)": 4, "Auditoria de Pequeno Porte/Contador": 2, "Não auditado": 1}
+    map_compliance = {"Maduras e implementadas": 5, "Em desenvolvimento": 3, "Inexistentes ou ad-hoc": 1}
+    map_litigios = {"Inexistente ou irrelevante": 5, "Baixo impacto financeiro": 4, "Médio impacto potencial": 2, "Alto impacto / Risco para a operação": 1}
+    map_emissor = {"Emissor recorrente com bom histórico": 5, "Poucas emissões ou histórico misto": 3, "Primeira emissão": 2, "Histórico negativo": 1}
+    map_socios = {"Altamente experiente e com boa reputação": 5, "Experiência moderada": 3, "Inexperiente ou com reputação questionável": 1}
+    map_risco = {"Baixo / Gerenciado": 5, "Moderado / Pontos de Atenção": 3, "Alto / Risco Relevante": 1}
 
-    # Adição dos scores à lista
     scores.append(map_ubo[st.session_state.ubo])
     scores.append(map_conselho[st.session_state.conselho])
-    scores.append(1 if st.session_state.comites else 4)
+    scores.append(5 if st.session_state.comites else 2) # Invertido de 1/4 para 5/2
     scores.append(map_auditoria[st.session_state.auditoria])
-    scores.append(5 if st.session_state.ressalvas else 1)
+    scores.append(1 if st.session_state.ressalvas else 5) # Invertido de 5/1 para 1/5
     scores.append(map_compliance[st.session_state.compliance])
     scores.append(map_litigios[st.session_state.litigios])
-    scores.append(5 if st.session_state.renegociacao else 1)
-    scores.append(5 if st.session_state.midia_negativa else 1)
+    scores.append(1 if st.session_state.renegociacao else 5) # Invertido de 5/1 para 1/5
+    scores.append(1 if st.session_state.midia_negativa else 5) # Invertido de 5/1 para 1/5
     scores.append(map_emissor[st.session_state.hist_emissor])
     scores.append(map_socios[st.session_state.exp_socios])
     scores.append(map_risco[st.session_state.risco_juridico])
     scores.append(map_risco[st.session_state.risco_ambiental])
     scores.append(map_risco[st.session_state.risco_social])
     
-    return sum(scores) / len(scores) if scores else 5
+    return sum(scores) / len(scores) if scores else 1
 
 def calcular_score_operacional():
     scores = []
-    # Mapeamentos existentes
-    map_track_record = {"Consistente e previsível": 1, "Desvios esporádicos": 3, "Atrasos e estouros recorrentes": 5}
-    map_reputacao = {"Positiva, baixo volume de queixas": 1, "Neutra, volume gerenciável": 3, "Negativa, alto volume de queixas sem resolução": 5}
-    map_politica_credito = {"Score de crédito, análise de renda (DTI) e garantias": 1, "Apenas análise de renda e garantias": 3, "Análise simplificada ou ad-hoc": 5}
-    map_exp_similar = {"Extensa e comprovada no segmento específico": 1, "Experiência relevante em segmentos correlatos": 2, "Experiência limitada ou em outros segmentos": 4, "Iniciante/Nenhuma": 5}
-    
-    # NOVO MAPEAMENTO PARA HISTÓRICO DOS SÓCIOS
+    map_track_record = {"Consistente e previsível": 5, "Desvios esporádicos": 3, "Atrasos e estouros recorrentes": 1}
+    map_reputacao = {"Positiva, baixo volume de queixas": 5, "Neutra, volume gerenciável": 3, "Negativa, alto volume de queixas sem resolução": 1}
+    map_politica_credito = {"Score de crédito, análise de renda (DTI) e garantias": 5, "Apenas análise de renda e garantias": 3, "Análise simplificada ou ad-hoc": 1}
+    map_exp_similar = {"Extensa e comprovada no segmento específico": 5, "Experiência relevante em segmentos correlatos": 4, "Experiência limitada ou em outros segmentos": 2, "Iniciante/Nenhuma": 1}
     map_hist_socios = {
-        "Sócio(s) com múltiplos empreendimentos de sucesso comprovado": 1,
-        "Sócio(s) com algum histórico de sucesso, sem falhas relevantes": 2,
-        "Primeiro empreendimento ou histórico desconhecido": 4,
-        "Sócio(s) com histórico de falências ou recuperações judiciais": 5
+        "Sócio(s) com múltiplos empreendimentos de sucesso comprovado": 5,
+        "Sócio(s) com algum histórico de sucesso, sem falhas relevantes": 4,
+        "Primeiro empreendimento ou histórico desconhecido": 2,
+        "Sócio(s) com histórico de falências ou recuperações judiciais": 1
     }
 
-    # Adição dos scores à lista
     scores.append(map_track_record[st.session_state.track_record])
     scores.append(map_reputacao[st.session_state.reputacao])
-    scores.append(1 if st.session_state.politica_formalizada else 4)
+    scores.append(5 if st.session_state.politica_formalizada else 2) # Invertido de 1/4 para 5/2
     scores.append(map_politica_credito[st.session_state.analise_credito])
     scores.append(map_exp_similar[st.session_state.exp_similar])
-    # ADIÇÃO DO NOVO SCORE
     scores.append(map_hist_socios[st.session_state.hist_socios])
     
-    return sum(scores) / len(scores) if scores else 5
+    return sum(scores) / len(scores) if scores else 1
 
 
 def calcular_score_financeiro():
     if st.session_state.modalidade_financeira == 'Análise Corporativa (Holding/Incorporadora)':
-        scores = []; dl_ebitda = st.session_state.dl_ebitda
-        if dl_ebitda < 2.0: scores.append(1)
-        elif dl_ebitda <= 3.0: scores.append(2)
+        scores = []
+        dl_ebitda = st.session_state.dl_ebitda
+        if dl_ebitda < 2.0: scores.append(5)
+        elif dl_ebitda <= 3.0: scores.append(4)
         elif dl_ebitda <= 4.0: scores.append(3)
-        elif dl_ebitda <= 5.0: scores.append(4)
-        else: scores.append(5)
+        elif dl_ebitda <= 5.0: scores.append(2)
+        else: scores.append(1)
+        
         liq_corrente = st.session_state.liq_corrente
-        if liq_corrente > 1.5: scores.append(1)
-        elif liq_corrente >= 1.2: scores.append(2)
+        if liq_corrente > 1.5: scores.append(5)
+        elif liq_corrente >= 1.2: scores.append(4)
         elif liq_corrente >= 1.0: scores.append(3)
-        elif liq_corrente >= 0.8: scores.append(4)
-        else: scores.append(5)
+        elif liq_corrente >= 0.8: scores.append(2)
+        else: scores.append(1)
+            
         fco_divida = st.session_state.fco_divida
-        if fco_divida > 30: scores.append(1)
-        elif fco_divida >= 20: scores.append(2)
+        if fco_divida > 30: scores.append(5)
+        elif fco_divida >= 20: scores.append(4)
         elif fco_divida >= 15: scores.append(3)
-        elif fco_divida >= 10: scores.append(4)
-        else: scores.append(5)
-        return sum(scores) / len(scores) if scores else 5
-    else:
-        scores = []; vgv_projeto = st.session_state.vgv_projeto
+        elif fco_divida >= 10: scores.append(2)
+        else: scores.append(1)
+        
+        return sum(scores) / len(scores) if scores else 1
+    else: # Análise de Projeto (SPE)
+        scores = []
+        vgv_projeto = st.session_state.vgv_projeto
         ltv = (st.session_state.divida_projeto / vgv_projeto) * 100 if vgv_projeto > 0 else 999
-        if ltv < 40: scores.append(1)
-        elif ltv <= 50: scores.append(2)
+        if ltv < 40: scores.append(5)
+        elif ltv <= 50: scores.append(4)
         elif ltv <= 60: scores.append(3)
-        elif ltv <= 70: scores.append(4)
-        else: scores.append(5)
+        elif ltv <= 70: scores.append(2)
+        else: scores.append(1)
+            
         custo_remanescente = st.session_state.custo_remanescente
         cobertura_obra = (st.session_state.recursos_obra / custo_remanescente) * 100 if custo_remanescente > 0 else 0
-        if cobertura_obra > 120: scores.append(1)
-        elif cobertura_obra >= 110: scores.append(2)
+        if cobertura_obra > 120: scores.append(5)
+        elif cobertura_obra >= 110: scores.append(4)
         elif cobertura_obra >= 100: scores.append(3)
-        elif cobertura_obra >= 90: scores.append(4)
-        else: scores.append(5)
+        elif cobertura_obra >= 90: scores.append(2)
+        else: scores.append(1)
+            
         sd_cri = st.session_state.sd_cri
         cobertura_vendas = (st.session_state.vgv_vendido / sd_cri) * 100 if sd_cri > 0 else 0
-        if cobertura_vendas > 150: scores.append(1)
-        elif cobertura_vendas >= 120: scores.append(2)
+        if cobertura_vendas > 150: scores.append(5)
+        elif cobertura_vendas >= 120: scores.append(4)
         elif cobertura_vendas >= 100: scores.append(3)
-        elif cobertura_vendas >= 70: scores.append(4)
-        else: scores.append(5)
-        return sum(scores) / len(scores) if scores else 5
+        elif cobertura_vendas >= 70: scores.append(2)
+        else: scores.append(1)
+            
+        return sum(scores) / len(scores) if scores else 1
 
-def calcular_score_lastro_projeto():
-    map_praca = {"Capital / Metrópole": 1, "Cidade Grande (>500k hab)": 2, "Cidade Média (100-500k hab)": 3, "Cidade Pequena (<100k hab)": 4}
-    map_micro = {"Nobre / Premium": 1, "Boa": 2, "Regular": 4, "Periférica / Risco": 5}
-    map_segmento = {"Residencial Vertical": 1, "Residencial Horizontal (Condomínio)": 2, "Comercial (Salas/Lajes)": 3, "Loteamento": 4, "Multipropriedade": 5}
-    score_localizacao = (map_praca[st.session_state.qualidade_municipio] + map_micro[st.session_state.microlocalizacao]) / 2
-    score_segmento = map_segmento[st.session_state.segmento_projeto]
-    score_viabilidade = (score_localizacao * 0.7) + (score_segmento * 0.3)
-    unid_ofertadas = st.session_state.unidades_ofertadas_inicio_mes
-    ivv_calculado = (st.session_state.unidades_vendidas_mes / unid_ofertadas) * 100 if unid_ofertadas > 0 else 0
-    st.session_state.ivv_calculado = ivv_calculado
-    if ivv_calculado > 7: score_ivv = 1
-    elif ivv_calculado >= 5: score_ivv = 2
-    elif ivv_calculado >= 3: score_ivv = 3
-    elif ivv_calculado >= 1: score_ivv = 4
-    else: score_ivv = 5
-    vgv_vendido_perc = st.session_state.vgv_vendido_perc
-    if vgv_vendido_perc > 70: score_vgv_vendido = 1
-    elif vgv_vendido_perc > 50: score_vgv_vendido = 2
-    elif vgv_vendido_perc > 30: score_vgv_vendido = 3
-    elif vgv_vendido_perc > 15: score_vgv_vendido = 4
-    else: score_vgv_vendido = 5
-    score_comercial = (score_ivv + score_vgv_vendido) / 2
-    map_cronograma = {"Adiantado ou no prazo": 1, "Atraso leve (< 3 meses)": 2, "Atraso significativo (3-6 meses)": 4, "Atraso severo (> 6 meses)": 5}
-    avanco_obra = st.session_state.avanco_fisico_obra
-    if avanco_obra >= 90: score_avanco = 1
-    elif avanco_obra >= 70: score_avanco = 2
-    elif avanco_obra >= 40: score_avanco = 3
-    elif avanco_obra >= 10: score_avanco = 4
-    else: score_avanco = 5
-    score_execucao = (map_cronograma[st.session_state.cronograma] + score_avanco) / 2
-    score_final = (score_viabilidade * 0.25) + (score_comercial * 0.40) + (score_execucao * 0.35)
+
+def calcular_score_lastro_carteira():
+    valor_garantias = st.session_state.valor_garantias_carteira
+    ltv_calculado = (st.session_state.saldo_devedor_carteira / valor_garantias) * 100 if valor_garantias > 0 else 999
+    st.session_state.ltv_medio_carteira = ltv_calculado
+    if ltv_calculado < 60: score_ltv = 5
+    elif ltv_calculado <= 70: score_ltv = 4
+    elif ltv_calculado <= 80: score_ltv = 3
+    elif ltv_calculado <= 90: score_ltv = 2
+    else: score_ltv = 1
+    
+    map_origem = {"Robusta e bem documentada (score, DTI, etc.)": 5, "Padrão de mercado": 3, "Frouxa, ad-hoc ou desconhecida": 1}
+    score_qualidade = (score_ltv + map_origem[st.session_state.origem]) / 2
+    
+    inadimplencia = st.session_state.inadimplencia
+    if inadimplencia < 1.0: score_inadimplencia = 5
+    elif inadimplencia <= 2.0: score_inadimplencia = 4
+    elif inadimplencia <= 3.5: score_inadimplencia = 3
+    elif inadimplencia <= 5.0: score_inadimplencia = 2
+    else: score_inadimplencia = 1
+    
+    map_vintage = {"Estável ou melhorando": 5, "Com leve deterioração": 3, "Com deterioração clara e preocupante": 1}
+    score_performance = (score_inadimplencia + map_vintage[st.session_state.vintage]) / 2
+    
+    concentracao_top5 = st.session_state.concentracao_top5
+    if concentracao_top5 < 10: score_concentracao = 5
+    elif concentracao_top5 <= 20: score_concentracao = 4
+    elif concentracao_top5 <= 30: score_concentracao = 3
+    elif concentracao_top5 <= 40: score_concentracao = 2
+    else: score_concentracao = 1
+    
+    score_final = (score_qualidade * 0.40) + (score_performance * 0.40) + (score_concentracao * 0.20)
     return score_final
 
 def calcular_score_lastro_carteira():
@@ -424,96 +426,95 @@ def calcular_score_lastro_carteira():
     return score_final
 
 def calcular_score_estrutura():
-    # --- Fator Estrutura de Capital (sem alterações) ---
     scores_capital = []
     subordinacao = st.session_state.subordinacao
-    if subordinacao > 20: scores_capital.append(1)
-    elif subordinacao >= 15: scores_capital.append(2)
+    if subordinacao > 20: scores_capital.append(5)
+    elif subordinacao >= 15: scores_capital.append(4)
     elif subordinacao >= 10: scores_capital.append(3)
-    elif subordinacao >= 5: scores_capital.append(4)
-    else: scores_capital.append(5)
-    map_waterfall = {"Clara, protetiva e bem definida": 1, "Padrão de mercado com alguma ambiguidade": 3, "Ambígua, com brechas ou prejudicial à série": 5}
+    elif subordinacao >= 5: scores_capital.append(2)
+    else: scores_capital.append(1)
+    map_waterfall = {"Clara, protetiva e bem definida": 5, "Padrão de mercado com alguma ambiguidade": 3, "Ambígua, com brechas ou prejudicial à série": 1}
     scores_capital.append(map_waterfall[st.session_state.waterfall])
     score_capital = sum(scores_capital) / len(scores_capital)
 
-    # --- Fator Mecanismos de Reforço (sem alterações) ---
     scores_reforco = []
     fundo_reserva_pmts = st.session_state.fundo_reserva_pmts
-    if fundo_reserva_pmts > 3: score_fundo = 1
-    elif fundo_reserva_pmts >= 2: score_fundo = 2
+    if fundo_reserva_pmts > 3: score_fundo = 5
+    elif fundo_reserva_pmts >= 2: score_fundo = 4
     elif fundo_reserva_pmts >= 1: score_fundo = 3
-    else: score_fundo = 5
-    if not st.session_state.fundo_reserva_regra: score_fundo = min(5, score_fundo + 1)
+    else: score_fundo = 1
+    if not st.session_state.fundo_reserva_regra: score_fundo = max(1, score_fundo - 1)
     scores_reforco.append(score_fundo)
+    
     oc = st.session_state.sobrecolateralizacao
-    if oc > 120: scores_reforco.append(1)
-    elif oc >= 110: scores_reforco.append(2)
+    if oc > 120: scores_reforco.append(5)
+    elif oc >= 110: scores_reforco.append(4)
     elif oc >= 105: scores_reforco.append(3)
-    elif oc > 100: scores_reforco.append(4)
-    else: scores_reforco.append(5)
+    elif oc > 100: scores_reforco.append(2)
+    else: scores_reforco.append(1)
+        
     spread = st.session_state.spread_excedente
-    if spread > 3: scores_reforco.append(1)
-    elif spread >= 2: scores_reforco.append(2)
+    if spread > 3: scores_reforco.append(5)
+    elif spread >= 2: scores_reforco.append(4)
     elif spread >= 1: scores_reforco.append(3)
-    elif spread > 0: scores_reforco.append(4)
-    else: scores_reforco.append(5)
+    elif spread > 0: scores_reforco.append(2)
+    else: scores_reforco.append(1)
     score_reforco = sum(scores_reforco) / len(scores_reforco)
 
-    # --- Fator Qualidade das Garantias (COM A NOVA LÓGICA) ---
     scores_garantias = []
-    # 1. Nova lógica para o TIPO de garantia (multiselect)
-    map_tipo_garantia = {
-        "Alienação Fiduciária de Imóveis": 1,
-        "Cessão Fiduciária de Recebíveis": 2,
-        "Fiança ou Aval": 4,
-        "Sem garantia real (Fidejussória)": 5
-    }
+    map_tipo_garantia = {"Alienação Fiduciária de Imóveis": 5, "Cessão Fiduciária de Recebíveis": 4, "Fiança ou Aval": 2, "Sem garantia real (Fidejussória)": 1}
     garantias_selecionadas = st.session_state.tipo_garantia
     
     if not garantias_selecionadas:
-        score_tipo = 5  # Risco máximo se nenhuma garantia for selecionada
+        score_tipo = 1
     else:
-        # Pega a pontuação da melhor garantia selecionada como base
         scores_das_selecionadas = [map_tipo_garantia[g] for g in garantias_selecionadas]
-        score_base = min(scores_das_selecionadas)
-        
-        # Aplica um bônus (redução de 0.5 na nota) para cada garantia ADICIONAL
+        score_base = max(scores_das_selecionadas)
         bonus = (len(garantias_selecionadas) - 1) * 0.5
-        score_tipo = max(1, score_base - bonus) # Garante que a nota não seja menor que 1
-        
+        score_tipo = min(5, score_base + bonus)
     scores_garantias.append(score_tipo)
 
-    # 2. Lógica para LTV (sem alterações)
     ltv = st.session_state.ltv_garantia
-    if ltv < 50: scores_garantias.append(1)
-    elif ltv <= 60: scores_garantias.append(2)
+    if ltv < 50: scores_garantias.append(5)
+    elif ltv <= 60: scores_garantias.append(4)
     elif ltv <= 70: scores_garantias.append(3)
-    elif ltv <= 80: scores_garantias.append(4)
-    else: scores_garantias.append(5)
-
-    # 3. Lógica para Liquidez (sem alterações)
-    map_liquidez_garantia = {"Alta (ex: aptos residenciais em capital)": 1, "Média (ex: salas comerciais, loteamentos)": 3, "Baixa (ex: imóvel de uso específico, rural)": 5}
+    elif ltv <= 80: scores_garantias.append(2)
+    else: scores_garantias.append(1)
+        
+    map_liquidez_garantia = {"Alta (ex: aptos residenciais em capital)": 5, "Média (ex: salas comerciais, loteamentos)": 3, "Baixa (ex: imóvel de uso específico, rural)": 1}
     scores_garantias.append(map_liquidez_garantia[st.session_state.liquidez_garantia])
-    
     score_garantias = sum(scores_garantias) / len(scores_garantias)
 
-    # --- Cálculo Final do Pilar 3 (sem alterações) ---
     score_final = (score_capital * 0.40) + (score_reforco * 0.30) + (score_garantias * 0.30)
     return score_final
 
 def calcular_score_juridico():
-    scores_conflito = []; map_independencia = {"Totalmente independentes": 1, "Partes relacionadas com mitigação de conflitos": 3, "Mesmo grupo econômico com alto potencial de conflito": 5}
-    scores_conflito.append(map_independencia[st.session_state.independencia]); scores_conflito.append(1 if st.session_state.retencao_risco else 4)
-    map_historico = {"Alinhado aos interesses dos investidores": 1, "Decisões mistas, alguns waivers aprovados": 3, "Histórico de decisões que beneficiam o devedor": 5}
-    scores_conflito.append(map_historico[st.session_state.historico_decisoes]); score_conflito = sum(scores_conflito) / len(scores_conflito)
-    scores_prestadores = []; map_ag_fiduciario = {"Alta, com histórico de proatividade": 1, "Média, cumpre o papel protocolar": 3, "Baixa, passivo ou com histórico negativo": 5}
-    scores_prestadores.append(map_ag_fiduciario[st.session_state.ag_fiduciario]); map_securitizadora = {"Alta, experiente e com bom histórico": 1, "Média, com histórico misto": 3, "Nova ou com histórico negativo": 5}
-    scores_prestadores.append(map_securitizadora[st.session_state.securitizadora]); map_servicer = {"Alta, com processos e tecnologia robustos": 1, "Padrão de mercado": 2, "Fraca ou inadequada": 4, "Não aplicável / Não avaliado": 2}
-    scores_prestadores.append(map_servicer[st.session_state.servicer]); score_prestadores = sum(scores_prestadores) / len(scores_prestadores)
-    scores_contratual = []; map_covenants = {"Fortes, objetivos e com gatilhos claros": 1, "Padrão, com alguma subjetividade": 3, "Fracos, subjetivos ou fáceis de contornar": 5}
-    scores_contratual.append(map_covenants[st.session_state.covenants]); map_pareceres = {"Abrangentes e conclusivos (escritório 1ª linha)": 1, "Padrão, cumprem requisitos formais": 2, "Limitados ou com ressalvas": 4}
-    scores_contratual.append(map_pareceres[st.session_state.pareceres]); map_relatorios = {"Alta, detalhados e frequentes": 1, "Média, cumprem o mínimo regulatório": 3, "Baixa, informações inconsistentes ou atrasadas": 5}
-    scores_contratual.append(map_relatorios[st.session_state.relatorios]); score_contratual = sum(scores_contratual) / len(scores_contratual)
+    scores_conflito = []
+    map_independencia = {"Totalmente independentes": 5, "Partes relacionadas com mitigação de conflitos": 3, "Mesmo grupo econômico com alto potencial de conflito": 1}
+    scores_conflito.append(map_independencia[st.session_state.independencia])
+    scores_conflito.append(5 if st.session_state.retencao_risco else 2)
+    map_historico = {"Alinhado aos interesses dos investidores": 5, "Decisões mistas, alguns waivers aprovados": 3, "Histórico de decisões que beneficiam o devedor": 1}
+    scores_conflito.append(map_historico[st.session_state.historico_decisoes])
+    score_conflito = sum(scores_conflito) / len(scores_conflito)
+    
+    scores_prestadores = []
+    map_ag_fiduciario = {"Alta, com histórico de proatividade": 5, "Média, cumpre o papel protocolar": 3, "Baixa, passivo ou com histórico negativo": 1}
+    scores_prestadores.append(map_ag_fiduciario[st.session_state.ag_fiduciario])
+    map_securitizadora = {"Alta, experiente e com bom histórico": 5, "Média, com histórico misto": 3, "Nova ou com histórico negativo": 1}
+    scores_prestadores.append(map_securitizadora[st.session_state.securitizadora])
+    map_servicer = {"Alta, com processos e tecnologia robustos": 5, "Padrão de mercado": 4, "Fraca ou inadequada": 2, "Não aplicável / Não avaliado": 4}
+    scores_prestadores.append(map_servicer[st.session_state.servicer])
+    score_prestadores = sum(scores_prestadores) / len(scores_prestadores)
+    
+    scores_contratual = []
+    map_covenants = {"Fortes, objetivos e com gatilhos claros": 5, "Padrão, com alguma subjetividade": 3, "Fracos, subjetivos ou fáceis de contornar": 1}
+    scores_contratual.append(map_covenants[st.session_state.covenants])
+    map_pareceres = {"Abrangentes e conclusivos (escritório 1ª linha)": 5, "Padrão, cumprem requisitos formais": 4, "Limitados ou com ressalvas": 2}
+    scores_contratual.append(map_pareceres[st.session_state.pareceres])
+    map_relatorios = {"Alta, detalhados e frequentes": 5, "Média, cumprem o mínimo regulatório": 3, "Baixa, informações inconsistentes ou atrasadas": 1}
+    scores_contratual.append(map_relatorios[st.session_state.relatorios])
+    score_contratual = sum(scores_contratual) / len(scores_contratual)
+    
     score_final = (score_conflito * 0.50) + (score_prestadores * 0.30) + (score_contratual * 0.20)
     return score_final
 
