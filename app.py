@@ -967,15 +967,21 @@ with tab5:
 
 with tab6:
     st.header("Resultado Final e Atribuição de Rating")
+
+    # Condições para garantir que todos os pilares foram calculados
     if len(st.session_state.scores) < 4:
         st.warning("Por favor, calcule todos os 4 pilares de score antes de prosseguir para o resultado final.")
     elif st.session_state.resultados_pilar5 is None:
         st.warning("Por favor, execute a simulação de Fluxo de Caixa no Pilar 5 antes de prosseguir.")
     else:
+        # Bloco principal de cálculo e exibição que só executa se tudo estiver ok
+        
+        # 1. Cálculo do Score Ponderado e Rating Indicado
         pesos = {'pilar1': 0.20, 'pilar2': 0.30, 'pilar3': 0.30, 'pilar4': 0.20}
         score_final_ponderado = sum(st.session_state.scores.get(p, 1) * pesos[p] for p in pesos)
         rating_indicado = converter_score_para_rating(score_final_ponderado)
         
+        # 2. Exibição do Scorecard Mestre
         st.subheader("Scorecard Mestre")
         data = {
             'Componente': ['Pilar 1: Originador/Devedor','Pilar 2: Lastro','Pilar 3: Estrutura e Reforços','Pilar 4: Jurídico/Governança'],
@@ -988,9 +994,10 @@ with tab6:
         
         c1, c2 = st.columns(2)
         c1.metric(label="Score Final Ponderado", value=f"{score_final_ponderado:.2f}")
-        c2.metric(label="Rating Indicado pelo Score", value=rating_indicado)
-        st.markdown("---")
+        c2.metric(label="Rating Indicado pelo Score (Série Sênior)", value=rating_indicado)
+        st.divider()
         
+        # 3. Exibição da Validação Quantitativa
         st.subheader("Validação Quantitativa (Pilar 5)")
         perdas = st.session_state.resultados_pilar5
         perda_moderado = perdas['perda_moderado']
@@ -1004,33 +1011,33 @@ with tab6:
         else:
             st.warning(f"⚠️ A estrutura apresentou perda de R$ {perda_severo:,.2f} no Cenário Severo.")
         
-        st.markdown("---")
-        # SUBSTITUA a seção "Deliberação Final" inteira por esta:
+        st.divider()
+
+        # 4. Exibição da Deliberação Final
         st.subheader("Deliberação Final do Comitê de Rating")
         col1, col2 = st.columns([1, 2])
 
-    with col1:
-        st.number_input(
-            "Ajuste Qualitativo do Comitê (notches)", 
-            min_value=-3, max_value=3, step=1, key='ajuste_final',
-            help="Permite ao analista ajustar o rating final com base em fatores não capturados pelo modelo."
-        )
-    
-        # Lógica para exibir os ratings finais
-        rating_final_senior = ajustar_rating(rating_indicado, st.session_state.ajuste_final)
-        st.metric(label="Rating Final Atribuído (Série Sênior)", value=rating_final_senior)
+        with col1:
+            st.number_input(
+                "Ajuste Qualitativo do Comitê (notches)", 
+                min_value=-3, max_value=3, step=1, key='ajuste_final',
+                help="Permite ao analista ajustar o rating final com base em fatores não capturados pelo modelo."
+            )
+            
+            # Lógica para exibir os ratings finais, usando a variável rating_indicado já definida
+            rating_final_senior = ajustar_rating(rating_indicado, st.session_state.ajuste_final)
+            st.metric(label="Rating Final Atribuído (Série Sênior)", value=rating_final_senior)
 
-        if st.session_state.estrutura_tipo == "Múltiplas Séries (com subordinação)":
-            # Aplica um rebaixamento de 4 notches para a série subordinada
-            rating_subordinada_indicado = ajustar_rating(rating_final_senior, -4)
-            st.metric(label="Rating Indicativo (Série Subordinada)", value=rating_subordinada_indicado)
-        else:
-            st.metric(label="Rating Indicativo (Série Subordinada)", value="Não Aplicável")
+            if st.session_state.estrutura_tipo == "Múltiplas Séries (com subordinação)":
+                rating_subordinada_indicado = ajustar_rating(rating_final_senior, -4)
+                st.metric(label="Rating Indicativo (Série Subordinada)", value=rating_subordinada_indicado)
+            else:
+                st.metric(label="Rating Indicativo (Série Subordinada)", value="Não Aplicável")
 
-    with col2:
-        st.text_area(
-            "Justificativa para o ajuste e comentários finais:", 
-            height=250, 
-            placeholder="Ex: Ajuste de +1 notch devido à força da garantia de alienação fiduciária, que não é totalmente capturada pelo modelo...", 
-            key='justificativa_final'
-        )
+        with col2:
+            st.text_area(
+                "Justificativa para o ajuste e comentários finais:", 
+                height=250, 
+                placeholder="Ex: Ajuste de +1 notch devido à força da garantia de alienação fiduciária, que não é totalmente capturada pelo modelo...", 
+                key='justificativa_final'
+            )
