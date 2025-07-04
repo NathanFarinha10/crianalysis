@@ -58,6 +58,7 @@ def inicializar_session_state():
 
             # Pilar 3
             'subordinacao': 10.0, 'waterfall': 'Padrão de mercado com alguma ambiguidade', 'fundo_reserva_pmts': 3.0,
+            'estrutura_tipo': 'Múltiplas Séries (com subordinação)',
             'fundo_reserva_regra': True, 'sobrecolateralizacao': 110.0, 'spread_excedente': 1.5,
             'tipo_garantia': ['Alienação Fiduciária de Imóveis'], 'ltv_garantia': 60.0, 'liquidez_garantia': 'Média (ex: salas comerciais, loteamentos)',
             
@@ -312,17 +313,26 @@ def calcular_score_lastro_carteira():
     return score_final
 
 def calcular_score_estrutura():
+    # --- Fator Estrutura de Capital (COM A NOVA LÓGICA) ---
     scores_capital = []
-    subordinacao = st.session_state.subordinacao
-    if subordinacao > 20: scores_capital.append(5)
-    elif subordinacao >= 15: scores_capital.append(4)
-    elif subordinacao >= 10: scores_capital.append(3)
-    elif subordinacao >= 5: scores_capital.append(2)
-    else: scores_capital.append(1)
+    
+    # Nova lógica para tipo de estrutura
+    if st.session_state.estrutura_tipo == "Série Única":
+        # Atribui a pior nota (1) pois não há subordinação para proteger a série
+        scores_capital.append(1)
+    else: # Caso de Múltiplas Séries
+        subordinacao = st.session_state.subordinacao
+        if subordinacao > 20: scores_capital.append(5)
+        elif subordinacao >= 15: scores_capital.append(4)
+        elif subordinacao >= 10: scores_capital.append(3)
+        elif subordinacao >= 5: scores_capital.append(2)
+        else: scores_capital.append(1)
+
     map_waterfall = {"Clara, protetiva e bem definida": 5, "Padrão de mercado com alguma ambiguidade": 3, "Ambígua, com brechas ou prejudicial à série": 1}
     scores_capital.append(map_waterfall[st.session_state.waterfall])
     score_capital = sum(scores_capital) / len(scores_capital)
 
+    # --- O restante da função permanece igual ---
     scores_reforco = []
     fundo_reserva_pmts = st.session_state.fundo_reserva_pmts
     if fundo_reserva_pmts > 3: score_fundo = 5
@@ -354,7 +364,7 @@ def calcular_score_estrutura():
     if not garantias_selecionadas:
         score_tipo = 1
     else:
-        scores_das_selecionadas = [map_tipo_garantia[g] for g in garantias_selecionadas]
+        scores_das_selecionadas = [map_tipo_garantia.get(g, 1) for g in garantias_selecionadas]
         score_base = max(scores_das_selecionadas)
         bonus = (len(garantias_selecionadas) - 1) * 0.5
         score_tipo = min(5, score_base + bonus)
@@ -766,8 +776,27 @@ with tab3:
     st.markdown("Peso no Scorecard Mestre: **30%**")
 
     with st.expander("Fator 1: Estrutura de Capital (Peso: 40%)", expanded=True):
-        st.number_input("Nível de subordinação (%) para a série em análise", key='subordinacao')
-        st.selectbox("Qualidade da Cascata de Pagamentos (Waterfall)", ["Clara, protetiva e bem definida", "Padrão de mercado com alguma ambiguidade", "Ambígua, com brechas ou prejudicial à série"], key='waterfall')
+        st.radio(
+            "Tipo de Estrutura de Capital:",
+            options=["Múltiplas Séries (com subordinação)", "Série Única"],
+            key='estrutura_tipo',
+            horizontal=True
+        )
+
+        # O campo de subordinação só aparece se for uma estrutura com múltiplas séries
+        if st.session_state.estrutura_tipo == "Múltiplas Séries (com subordinação)":
+            st.number_input(
+                "Nível de subordinação (%) para a série em análise", 
+                key='subordinacao', 
+                help="Principal 'colchão' de proteção da série. Quanto maior, melhor."
+            )
+
+        st.selectbox(
+            "Qualidade da Cascata de Pagamentos (Waterfall)",
+            ["Clara, protetiva e bem definida", "Padrão de mercado com alguma ambiguidade", "Ambígua, com brechas ou prejudicial à série"],
+            key='waterfall',
+            help="A ordem de pagamentos deve ser clara e proteger a série analisada."
+        )
     with st.expander("Fator 2: Mecanismos de Reforço e Liquidez (Peso: 30%)"):
         st.number_input("Tamanho do Fundo de Reserva (em nº de pagamentos)", key='fundo_reserva_pmts')
         st.checkbox("O Fundo de Reserva possui mecanismo de recomposição obrigatória?", key='fundo_reserva_regra')
@@ -976,12 +1005,32 @@ with tab6:
             st.warning(f"⚠️ A estrutura apresentou perda de R$ {perda_severo:,.2f} no Cenário Severo.")
         
         st.markdown("---")
+        # SUBSTITUA a seção "Deliberação Final" inteira por esta:
         st.subheader("Deliberação Final do Comitê de Rating")
-        col1, col2 = st.columns([1,2])
-        with col1:
-            st.number_input("Ajuste Qualitativo do Comitê (notches)", min_value=-3, max_value=3, step=1, key='ajuste_final')
-            rating_final = ajustar_rating(rating_indicado, st.session_state.ajuste_final)
-            st.metric(label="Rating Final Atribuído (Série Sênior)", value=rating_final)
-            st.text_input("Rating Final Atribuído (Série Subordinada)", key='rating_subordinada')
-        with col2:
-            st.text_area("Justificativa para o ajuste e comentários finais:", height=250, placeholder="Ex: Ajuste de +1 notch devido à força da garantia de alienação fiduciária, que não é totalmente capturada pelo modelo...", key='justificativa_final')
+        col1, col2 = st.columns([1, 2])
+
+    with col1:
+        st.number_input(
+            "Ajuste Qualitativo do Comitê (notches)", 
+            min_value=-3, max_value=3, step=1, key='ajuste_final',
+            help="Permite ao analista ajustar o rating final com base em fatores não capturados pelo modelo."
+        )
+    
+        # Lógica para exibir os ratings finais
+        rating_final_senior = ajustar_rating(rating_indicado, st.session_state.ajuste_final)
+        st.metric(label="Rating Final Atribuído (Série Sênior)", value=rating_final_senior)
+
+        if st.session_state.estrutura_tipo == "Múltiplas Séries (com subordinação)":
+            # Aplica um rebaixamento de 4 notches para a série subordinada
+            rating_subordinada_indicado = ajustar_rating(rating_final_senior, -4)
+            st.metric(label="Rating Indicativo (Série Subordinada)", value=rating_subordinada_indicado)
+        else:
+            st.metric(label="Rating Indicativo (Série Subordinada)", value="Não Aplicável")
+
+    with col2:
+        st.text_area(
+            "Justificativa para o ajuste e comentários finais:", 
+            height=250, 
+            placeholder="Ex: Ajuste de +1 notch devido à força da garantia de alienação fiduciária, que não é totalmente capturada pelo modelo...", 
+            key='justificativa_final'
+        )
