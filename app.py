@@ -458,7 +458,7 @@ col1, col2 = st.columns([1, 5], gap="medium") # Cria duas colunas, a segunda é 
 
 with col1:
     # Substitua "assets/seu_logo.png" pelo caminho correto do seu arquivo de imagem
-    st.image("assets/seu_logo.png", width=480) 
+    st.image("assets/seu_logo.png", width=600) 
 
 with col2:
     st.title("Plataforma de Análise e Rating de CRI")
