@@ -84,6 +84,9 @@ def inicializar_session_state():
 
             # Pilar 7
             'viabilidade_tma': 15.0,
+
+            # Precificação
+           'precificacao_ntnb': 6.25,
             
             # Resultado Final
             'ajuste_final': 0, 'justificativa_final': ''
@@ -636,69 +639,6 @@ def calcular_payback(df_fluxo_caixa):
         return payback_mes
     except ValueError:
         return "Não atinge"
-
-# SUBSTITUA a antiga função obter_taxa_livre_risco por ESTAS DUAS NOVAS FUNÇÕES
-
-@st.cache_data(ttl="4h") # Armazena o resultado em cache por 4 horas
-def _buscar_dados_curva_anbima():
-    """
-    Busca os dados da curva de juros de uma API e os formata em um dicionário.
-    """
-    # IMPORTANTE: Substitua esta URL pela URL correta da sua API da Anbima.
-    # Este é um exemplo de endpoint público do Tesouro Direto para ilustrar.
-    URL_API = "https://api-sandbox.anbima.com.br/feed/precos-indices/v1/titulos-publicos/mercado-secundario-TPF"
-    
-    try:
-        response = requests.get(URL_API)
-        response.raise_for_status()  # Lança um erro para status HTTP 4xx/5xx
-        dados = response.json()
-        
-        # O processamento abaixo depende da estrutura EXATA do JSON da sua API.
-        # Este é um exemplo para o JSON do Tesouro Direto.
-        # Você precisará adaptar esta parte para a sua API da Anbima.
-        curva_ntnb = {}
-        for titulo in dados['response']['TrsrBdTradgList']:
-            if "NTN-B" in titulo['TrsrBd']['nm']:
-                # Converte o prazo em anos
-                duration_dias = (datetime.datetime.strptime(titulo['TrsrBd']['mtrtyDt'], "%Y-%m-%d").date() - datetime.date.today()).days
-                duration_anos = duration_dias / 365.25
-                # Taxa de compra
-                taxa = titulo['TrsrBd']['untrInvstmtRate']
-                curva_ntnb[duration_anos] = taxa * 100 # Converte para porcentagem
-
-        # Se a API falhar ou não retornar dados, usamos uma curva de fallback
-        if not curva_ntnb:
-            raise ValueError("Nenhum dado de NTN-B encontrado na resposta da API.")
-            
-        return curva_ntnb
-
-    except (requests.exceptions.RequestException, ValueError, KeyError) as e:
-        st.error(f"Não foi possível buscar dados da curva de juros em tempo real: {e}. Usando dados de fallback.")
-        # Curva de Juros de Fallback (a que usávamos antes)
-        return { 0.5: 5.80, 1.0: 5.90, 2.0: 6.00, 3.0: 6.10, 5.0: 6.25, 10.0: 6.50, 20.0: 6.60 }
-
-def obter_taxa_livre_risco(duration_anos):
-    """
-    Busca a curva de juros e interpola a taxa para a duration desejada.
-    """
-    curva_ntnb = _buscar_dados_curva_anbima()
-    durations = sorted(curva_ntnb.keys())
-    
-    if not durations:
-        return 6.0 # Retorna um valor padrão se a curva estiver vazia
-
-    if duration_anos <= durations[0]:
-        return curva_ntnb[durations[0]]
-    if duration_anos >= durations[-1]:
-        return curva_ntnb[durations[-1]]
-        
-    for i in range(len(durations) - 1):
-        if durations[i] <= duration_anos < durations[i+1]:
-            x0, y0 = durations[i], curva_ntnb[durations[i]]
-            x1, y1 = durations[i+1], curva_ntnb[durations[i+1]]
-            return y0 + (y1 - y0) * (duration_anos - x0) / (x1 - x0)
-
-    return 6.0 # Fallback
     
 def obter_spread_credito(rating, duration_anos):
     """
@@ -1301,6 +1241,8 @@ with tab7:
         st.info("A Análise de Viabilidade do Empreendimento se aplica apenas ao modelo de 'Desenvolvimento Imobiliário'.")
 
 
+# SUBSTITUA o conteúdo da aba 8 inteiro por este:
+
 with tab8:
     st.header("💰 Precificação Indicativa do CRI")
     
@@ -1310,29 +1252,37 @@ with tab8:
     elif st.session_state.fluxo_modelado_df.empty:
         st.warning("⬅️ Por favor, execute a modelagem do fluxo de caixa na aba '📊 Modelagem' para calcular o Duration.")
     else:
-        st.info("As taxas abaixo são calculadas com base no rating final da série sênior e na duration da operação, usando uma curva de juros e matriz de spread simuladas.")
+        st.info("A precificação abaixo é calculada somando um spread de crédito (baseado no rating e duration) a uma taxa de referência (NTN-B) inserida manualmente.")
 
-        # 1. Obter os dados necessários
+        # 1. Obter os dados necessários da análise
         rating_final_senior = ajustar_rating(
             converter_score_para_rating(sum(st.session_state.scores.get(p, 1) * w for p, w in {'pilar1': 0.2, 'pilar2': 0.3, 'pilar3': 0.3, 'pilar4': 0.2}.items())),
             st.session_state.ajuste_final
         )
         
-        # Usa o fluxo de caixa correto dependendo do modelo para calcular o duration
         if st.session_state.tipo_modelagem_p5 == 'Projeto (Desenvolvimento Imobiliário)':
             coluna_fluxo_duration = 'Obrigações do CRI'
-        else: # Carteira de Recebíveis
+        else:
             st.session_state.fluxo_modelado_df['FluxoTotal'] = st.session_state.fluxo_modelado_df['Juros Recebidos'] + st.session_state.fluxo_modelado_df['Amortização Recebida']
             coluna_fluxo_duration = 'FluxoTotal'
             
         duration_op = calcular_duration(st.session_state.fluxo_modelado_df, coluna_fluxo_duration, st.session_state.modelagem_yield)
 
-        # 2. Calcular a precificação da Série Sênior
-        taxa_ref = obter_taxa_livre_risco(duration_op)
+        st.divider()
+        
+        # 2. NOVO INPUT MANUAL PARA A TAXA DE REFERÊNCIA
+        st.subheader("Parâmetros de Precificação")
+        taxa_ref = st.number_input(
+            f"Taxa da NTN-B para Duration Equivalente ({duration_op:.2f} anos) (% a.a.):",
+            min_value=0.0, max_value=20.0, key='precificacao_ntnb', step=0.01,
+            help="Insira aqui a taxa de juros (yield) do título público com prazo mais próximo ao duration da operação."
+        )
+
+        # 3. Calcular a precificação da Série Sênior
         spread_senior = obter_spread_credito(rating_final_senior, duration_op)
         taxa_final_senior = taxa_ref + spread_senior
 
-        # 3. Calcular a precificação da Série Subordinada (se aplicável)
+        # 4. Calcular a precificação da Série Subordinada (se aplicável)
         if st.session_state.estrutura_tipo == "Múltiplas Séries (com subordinação)":
             rating_sub = ajustar_rating(rating_final_senior, -4)
             spread_sub = obter_spread_credito(rating_sub, duration_op)
@@ -1346,7 +1296,7 @@ with tab8:
             st.subheader("Precificação da Série Sênior")
             st.metric("Rating Final da Série", rating_final_senior)
             st.metric("Duration da Operação", f"{duration_op:.2f} anos")
-            st.metric(f"Taxa NTN-B ({duration_op:.2f} anos)", f"{taxa_ref:.2f}% a.a.")
+            st.metric(f"Taxa de Referência (NTN-B)", f"{taxa_ref:.2f}% a.a.")
             st.metric("Spread de Crédito Exigido", f"{spread_senior:.2f}%")
             st.success(f"**Taxa Indicativa (Sênior): IPCA + {taxa_final_senior:.2f}% a.a.**")
             
@@ -1355,7 +1305,7 @@ with tab8:
                 st.subheader("Precificação da Série Subordinada")
                 st.metric("Rating Indicativo da Série", rating_sub)
                 st.metric("Duration da Operação", f"{duration_op:.2f} anos")
-                st.metric(f"Taxa NTN-B ({duration_op:.2f} anos)", f"{taxa_ref:.2f}% a.a.")
+                st.metric(f"Taxa de Referência (NTN-B)", f"{taxa_ref:.2f}% a.a.")
                 st.metric("Spread de Crédito Exigido", f"{spread_sub:.2f}%")
                 st.warning(f"**Taxa Indicativa (Subordinada): IPCA + {taxa_final_sub:.2f}% a.a.**")
             else:
