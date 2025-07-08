@@ -319,13 +319,15 @@ def calcular_score_financeiro():
     return sum(scores) / len(scores) if scores else 1
 
 def calcular_score_lastro_projeto():
+    # --- Fator 1: Viabilidade de Mercado (COM A NOVA LÓGICA) ---
+    scores_viabilidade = []
     map_praca = {"Capital / Metrópole": 5, "Cidade Grande (>500k hab)": 4, "Cidade Média (100-500k hab)": 3, "Cidade Pequena (<100k hab)": 2}
     map_micro = {"Nobre / Premium": 5, "Boa": 4, "Regular": 2, "Periférica / Risco": 1}
     map_segmento = {"Residencial Vertical": 5, "Residencial Horizontal (Condomínio)": 4, "Comercial (Salas/Lajes)": 3, "Loteamento": 2, "Multipropriedade": 1}
     map_adequacao = {'Muito adequada': 5, 'Adequada': 4, 'Pouco adequada': 2, 'Inadequada': 1}
     map_preco = {'Abaixo dos concorrentes': 5, 'Em linha com concorrentes': 4, 'Acima dos concorrentes': 2}
     map_desconto = {'Não (ou com prêmio)': 5, 'Sim, descontos pontuais': 3, 'Sim, descontos agressivos e recorrentes': 1}
-    score_localizacao = (map_praca[st.session_state.qualidade_municipio] + map_micro[st.session_state.microlocalizacao]) / 2
+
     scores_viabilidade.append(map_praca[st.session_state.qualidade_municipio])
     scores_viabilidade.append(map_micro[st.session_state.microlocalizacao])
     scores_viabilidade.append(map_segmento[st.session_state.segmento_projeto])
@@ -333,24 +335,32 @@ def calcular_score_lastro_projeto():
     scores_viabilidade.append(map_adequacao[st.session_state.adequacao_renda])
     scores_viabilidade.append(map_preco[st.session_state.adequacao_preco])
     scores_viabilidade.append(map_desconto[st.session_state.vendas_desconto])
+    
     score_viabilidade = sum(scores_viabilidade) / len(scores_viabilidade)
+
+    # --- Fator 2: Performance Comercial (Lógica original recuperada e invertida) ---
     unid_ofertadas = st.session_state.unidades_ofertadas_inicio_mes
     ivv_calculado = (st.session_state.unidades_vendidas_mes / unid_ofertadas) * 100 if unid_ofertadas > 0 else 0
     st.session_state.ivv_calculado = ivv_calculado
     if ivv_calculado > 7: score_ivv = 5
     elif ivv_calculado >= 4: score_ivv = 3
     else: score_ivv = 1
+        
     vgv_vendido_perc = st.session_state.vgv_vendido_perc
     if vgv_vendido_perc > 70: score_vgv_vendido = 5
     elif vgv_vendido_perc > 40: score_vgv_vendido = 3
     else: score_vgv_vendido = 1
     score_comercial = (score_ivv + score_vgv_vendido) / 2
+    
+    # --- Fator 3: Risco de Execução (Lógica original recuperada e invertida) ---
     map_cronograma = {"Adiantado ou no prazo": 5, "Atraso leve (< 3 meses)": 4, "Atraso significativo (3-6 meses)": 2, "Atraso severo (> 6 meses)": 1}
     avanco_obra = st.session_state.avanco_fisico_obra
     if avanco_obra >= 90: score_avanco = 5
     elif avanco_obra >= 50: score_avanco = 3
     else: score_avanco = 1
     score_execucao = (map_cronograma[st.session_state.cronograma] + score_avanco) / 2
+    
+    # --- Cálculo final ponderado ---
     return (score_viabilidade * 0.25) + (score_comercial * 0.40) + (score_execucao * 0.35)
 
 def calcular_score_lastro_carteira():
