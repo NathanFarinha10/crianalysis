@@ -1157,7 +1157,8 @@ with tab7:
     st.header("Análise de Viabilidade Financeira do Empreendimento")
 
     # A análise só é válida para o modelo de Projeto
-    if st.session_state.tipo_modelagem_p5 == 'Desenvolvimento Imobiliário':
+    # DEPOIS
+    if st.session_state.tipo_modelagem_p5 == 'Projeto (Desenvolvimento Imobiliário)':
         
         # Verifica se a modelagem já foi executada na aba anterior
         if 'fluxo_modelado_df' not in st.session_state or st.session_state.fluxo_modelado_df.empty:
