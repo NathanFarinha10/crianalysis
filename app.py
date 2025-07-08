@@ -80,6 +80,7 @@ def inicializar_session_state():
             'saldo_lastro_p5': 100000000.0, 'saldo_cri_p5': 80000000.0, 'taxa_lastro_p5': 12.0, 'taxa_cri_p5': 10.0,
             'prazo_p5': 60, 'despesas_p5': 10000.0, 'inad_base': 2.0, 'prep_base': 10.0, 'sev_base': 30, 'lag_base': 12,
             'inad_mod': 5.0, 'prep_mod': 5.0, 'sev_mod': 50, 'lag_mod': 18, 'inad_sev': 10.0, 'prep_sev': 2.0, 'sev_sev': 70, 'lag_sev': 24,
+            'modelagem_yield': 12.0,
             
             # Resultado Final
             'ajuste_final': 0, 'justificativa_final': ''
@@ -567,31 +568,44 @@ def gerar_fluxo_projeto(ss):
         st.error(f"Erro ao gerar fluxo do projeto: {e}")
         return pd.DataFrame()
 
-def calcular_duration(df_fluxo, taxa_yield_anual):
-    """Calcula a Macaulay Duration em anos."""
-    try:
-        taxa_yield_mensal = (1 + taxa_yield_anual / 100)**(1/12) - 1
-        # O fluxo de caixa total para o investidor é a soma de juros e amortização
-        df_fluxo['FluxoTotal'] = df_fluxo['Juros Recebidos'] + df_fluxo['Amortização Recebida']
-        
-        # Numerador da fórmula do Duration
-        soma_pv_ponderado_tempo = sum(
-            (t / 12) * cf / (1 + taxa_yield_mensal)**t
-            for t, cf in zip(df_fluxo['Mês'], df_fluxo['FluxoTotal'])
-        )
-        
-        # Denominador (preço do título ou VPL)
-        soma_pv = sum(
-            cf / (1 + taxa_yield_mensal)**t
-            for t, cf in zip(df_fluxo['Mês'], df_fluxo['FluxoTotal'])
-        )
-        
-        if soma_pv == 0: return 0.0
-        
-        return soma_pv_ponderado_tempo / soma_pv
-    except Exception:
-        return 0.0
+# Adicione esta função completa na seção de funções de modelagem
 
+# SUBSTITUA a função calcular_duration inteira por esta versão mais genérica
+
+def calcular_duration(df_fluxo, coluna_fluxo, taxa_yield_anual):
+    """
+    Calcula a Macaulay Duration em anos a partir de um dataframe de fluxo de caixa.
+    A função agora é genérica e aceita o nome da coluna com os fluxos de caixa.
+    """
+    try:
+        # Verifica se a coluna de fluxo de caixa existe no DataFrame
+        if coluna_fluxo not in df_fluxo.columns:
+            st.error(f"Erro no cálculo do Duration: a coluna '{coluna_fluxo}' não foi encontrada no fluxo de caixa.")
+            return 0.0
+
+        taxa_yield_mensal = (1 + taxa_yield_anual / 100)**(1/12) - 1
+        
+        # Calcula o Valor Presente (Preço do Título)
+        soma_pv_fluxos = sum(
+            cf / (1 + taxa_yield_mensal)**t
+            for t, cf in zip(df_fluxo['Mês'], df_fluxo[coluna_fluxo])
+        )
+
+        if soma_pv_fluxos == 0: return 0.0
+            
+        # Calcula o Valor Presente dos fluxos ponderado pelo tempo
+        soma_pv_ponderado_tempo = sum(
+            (t) * cf / (1 + taxa_yield_mensal)**t
+            for t, cf in zip(df_fluxo['Mês'], df_fluxo[coluna_fluxo])
+        )
+        
+        duration_meses = soma_pv_ponderado_tempo / soma_pv_fluxos
+        
+        return duration_meses / 12
+        
+    except Exception as e:
+        st.error(f"Erro ao calcular o Duration: {e}")
+        return 0.0
 @st.cache_data
 def run_cashflow_simulation(cenario_premissas, saldo_lastro, saldo_cri_p5, taxa_lastro, taxa_cri_p5, prazo, despesas):
     taxa_inadimplencia_aa = cenario_premissas['inadimplencia'] / 100
@@ -907,9 +921,12 @@ with tab4:
 with tab5:
     st.header("📊 Pilar 5: Modelagem Financeira e Teste de Estresse")
     st.markdown("Esta seção é o motor quantitativo da análise. Modele o fluxo de caixa do lastro para, em seguida, validar a resiliência da estrutura através de testes de estresse.")
-    st.number_input("Taxa de Desconto / Yield da Operação (% a.a.)", 1.0, 30.0, 15.0, 0.5, key='modelagem_yield', help="Utilizada para calcular o valor presente dos fluxos e o Duration.")
+
+    st.number_input("Taxa de Desconto / Yield da Operação (% a.a.)", 1.0, 30.0, key='modelagem_yield', step=0.5, help="Utilizada para calcular o valor presente dos fluxos e o Duration.")
+
     tipo_modelagem = st.radio("Selecione a natureza do lastro para modelagem:", ('Projeto (Desenvolvimento Imobiliário)', 'Carteira de Recebíveis (Crédito Pulverizado)'), key="tipo_modelagem_p5", horizontal=True)
     st.divider()
+
     if tipo_modelagem == 'Projeto (Desenvolvimento Imobiliário)':
         st.subheader("Módulo de Modelagem: Risco de Projeto")
         col1, col2 = st.columns(2)
@@ -946,16 +963,24 @@ with tab5:
                     st.session_state.proj_tipologias[i]['permutadas'] = col_unid3.number_input(f"Unidades Permutadas", value=tipologia['permutadas'], step=1, key=f"permutadas_{i}")
         with st.expander("Projeção de Comercialização (Velocidade de Vendas)", expanded=True):
             st.slider("Velocidade de Vendas projetada (% do estoque/mês)", 0, 100, 5, key="proj_ivv_projecao")
+        
         st.divider()
         if st.button("Modelar Cenário Base do Projeto", use_container_width=True):
             with st.spinner("Gerando fluxo de caixa do projeto..."):
                 st.session_state.fluxo_modelado_df = gerar_fluxo_projeto(st.session_state)
-        if not st.session_state.fluxo_modelado_df.empty:
+        
+        if 'fluxo_modelado_df' in st.session_state and not st.session_state.fluxo_modelado_df.empty:
             st.subheader("Resultados da Modelagem do Projeto")
             df = st.session_state.fluxo_modelado_df
             st.line_chart(df.set_index('Mês')[['Receita de Vendas', 'Desembolso da Obra', 'Obrigações do CRI']])
             st.area_chart(df.set_index('Mês')[['Fluxo de Caixa Líquido']])
             st.line_chart(df.set_index('Mês')[['Saldo Devedor CRI', 'Estoque Remanescente (VGV)']])
+
+            st.divider()
+            st.subheader("Indicadores Financeiros Calculados")
+            duration_anos = calcular_duration(df, 'Obrigações do CRI', st.session_state.modelagem_yield)
+            st.metric("Macaulay Duration", f"{duration_anos:.2f} anos")
+
     elif tipo_modelagem == 'Carteira de Recebíveis (Crédito Pulverizado)':
         st.subheader("Módulo de Modelagem: Risco de Crédito")
         with st.expander("Características Gerais da Carteira", expanded=True):
@@ -968,21 +993,29 @@ with tab5:
                 st.number_input("Prazo Remanescente Médio (meses)", key="cart_prazo_medio", step=1)
                 st.slider("Percentual do Saldo com Pagamento 'Balão' (%)", 0, 100, 0, key="cart_perc_balao")
                 st.number_input("LTV Médio Ponderado dos Clientes (%)", key="cart_ltv_medio")
+        
         st.divider()
         if st.button("Modelar Cenário Base da Carteira", use_container_width=True):
             with st.spinner("Gerando fluxo de caixa da carteira..."):
                 st.session_state.fluxo_modelado_df = gerar_fluxo_carteira(st.session_state)
-        if not st.session_state.fluxo_modelado_df.empty:
+        
+        if 'fluxo_modelado_df' in st.session_state and not st.session_state.fluxo_modelado_df.empty:
             st.subheader("Resultados da Modelagem da Carteira")
             df = st.session_state.fluxo_modelado_df
+            df['FluxoTotal'] = df['Juros Recebidos'] + df['Amortização Recebida']
+            
             st.area_chart(df.set_index('Mês')[['Juros Recebidos', 'Amortização Recebida']])
             st.line_chart(df.set_index('Mês')[['Saldo Devedor']])
-        df = st.session_state.fluxo_modelado_df
-        duration_anos = calcular_duration(df.copy(), st.session_state.modelagem_yield)
-        st.metric("Macaulay Duration (Anos)", f"{duration_anos:.2f} anos")
+
+            st.divider()
+            st.subheader("Indicadores Financeiros Calculados")
+            duration_anos = calcular_duration(df, 'FluxoTotal', st.session_state.modelagem_yield)
+            st.metric("Macaulay Duration", f"{duration_anos:.2f} anos")
+            
     st.divider()
     st.subheader("Validação da Estrutura: Teste de Estresse")
     st.markdown("Após modelar o cenário base, utilize esta seção para estressar as premissas e testar a resiliência.")
+    
     with st.expander("Inputs do Modelo (Dados da Operação)", expanded=True):
         c1, c2, c3 = st.columns(3)
         with c1: st.number_input("Saldo Devedor do Lastro (R$)", key='saldo_lastro_p5')
@@ -992,6 +1025,7 @@ with tab5:
         with c4: st.number_input("Saldo Devedor do CRI (Série Sênior) (R$)", key='saldo_cri_p5')
         with c5: st.number_input("Taxa da Série Sênior (% a.a.)", key='taxa_cri_p5')
         with c6: st.number_input("Despesas Fixas Mensais (R$)", key='despesas_p5')
+
     st.subheader("Definição das Premissas dos Cenários de Estresse")
     cenarios = {}
     c1, c2, c3 = st.columns(3)
@@ -1004,6 +1038,7 @@ with tab5:
     with c3:
         st.markdown("#### Cenário Severo")
         cenarios['severo'] = {'inadimplencia': st.slider("Inadimplência (% a.a.)", 0.0, 40.0, key="inad_sev"), 'prepagamento': st.slider("Pré-pagamento (% a.a.)", 0.0, 20.0, key="prep_sev"), 'severidade': st.slider("Severidade da Perda (%)", 0, 100, key="sev_sev"), 'lag': st.slider("Lag de Recuperação (meses)", 0, 24, key="lag_sev", format="%d")}
+
     if st.button("Executar Simulação de Teste de Estresse", use_container_width=True):
         with st.spinner("Simulando cenários de estresse..."):
             perda_base, df_base = run_cashflow_simulation(cenarios['base'], st.session_state.saldo_lastro_p5, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro_p5, st.session_state.taxa_cri_p5, st.session_state.prazo_p5, st.session_state.despesas_p5)
@@ -1011,6 +1046,7 @@ with tab5:
             perda_sev, df_sev = run_cashflow_simulation(cenarios['severo'], st.session_state.saldo_lastro_p5, st.session_state.saldo_cri_p5, st.session_state.taxa_lastro_p5, st.session_state.taxa_cri_p5, st.session_state.prazo_p5, st.session_state.despesas_p5)
             st.session_state.resultados_pilar5 = {'perda_base': perda_base, 'perda_moderado': perda_mod, 'perda_severo': perda_sev}
         st.success("Simulação de estresse concluída!")
+
     if st.session_state.get('resultados_pilar5') is not None:
         st.subheader("Resultados da Simulação de Estresse")
         rc1, rc2, rc3 = st.columns(3)
