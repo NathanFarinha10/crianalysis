@@ -637,44 +637,69 @@ def calcular_payback(df_fluxo_caixa):
     except ValueError:
         return "Não atinge"
 
-# Adicione estas funções
+# SUBSTITUA a antiga função obter_taxa_livre_risco por ESTAS DUAS NOVAS FUNÇÕES
+
+@st.cache_data(ttl="4h") # Armazena o resultado em cache por 4 horas
+def _buscar_dados_curva_anbima():
+    """
+    Busca os dados da curva de juros de uma API e os formata em um dicionário.
+    """
+    # IMPORTANTE: Substitua esta URL pela URL correta da sua API da Anbima.
+    # Este é um exemplo de endpoint público do Tesouro Direto para ilustrar.
+    URL_API = "https://api-sandbox.anbima.com.br/feed/precos-indices/v1/titulos-publicos/mercado-secundario-TPF"
+    
+    try:
+        response = requests.get(URL_API)
+        response.raise_for_status()  # Lança um erro para status HTTP 4xx/5xx
+        dados = response.json()
+        
+        # O processamento abaixo depende da estrutura EXATA do JSON da sua API.
+        # Este é um exemplo para o JSON do Tesouro Direto.
+        # Você precisará adaptar esta parte para a sua API da Anbima.
+        curva_ntnb = {}
+        for titulo in dados['response']['TrsrBdTradgList']:
+            if "NTN-B" in titulo['TrsrBd']['nm']:
+                # Converte o prazo em anos
+                duration_dias = (datetime.datetime.strptime(titulo['TrsrBd']['mtrtyDt'], "%Y-%m-%d").date() - datetime.date.today()).days
+                duration_anos = duration_dias / 365.25
+                # Taxa de compra
+                taxa = titulo['TrsrBd']['untrInvstmtRate']
+                curva_ntnb[duration_anos] = taxa * 100 # Converte para porcentagem
+
+        # Se a API falhar ou não retornar dados, usamos uma curva de fallback
+        if not curva_ntnb:
+            raise ValueError("Nenhum dado de NTN-B encontrado na resposta da API.")
+            
+        return curva_ntnb
+
+    except (requests.exceptions.RequestException, ValueError, KeyError) as e:
+        st.error(f"Não foi possível buscar dados da curva de juros em tempo real: {e}. Usando dados de fallback.")
+        # Curva de Juros de Fallback (a que usávamos antes)
+        return { 0.5: 5.80, 1.0: 5.90, 2.0: 6.00, 3.0: 6.10, 5.0: 6.25, 10.0: 6.50, 20.0: 6.60 }
 
 def obter_taxa_livre_risco(duration_anos):
     """
-    Simula a busca da taxa de uma NTN-B para uma dada duration,
-    usando interpolação linear em uma curva de juros de exemplo.
+    Busca a curva de juros e interpola a taxa para a duration desejada.
     """
-    # Curva de Juros de Exemplo (Duration em Anos, Taxa em % a.a.)
-    # Em um ambiente real, estes dados viriam de uma fonte de mercado (ex: Anbima, Bloomberg)
-    curva_ntnb = {
-        0.5: 5.80,
-        1.0: 5.90,
-        2.0: 6.00,
-        3.0: 6.10,
-        5.0: 6.25,
-        10.0: 6.50,
-        20.0: 6.60
-    }
-    
+    curva_ntnb = _buscar_dados_curva_anbima()
     durations = sorted(curva_ntnb.keys())
     
-    # Se a duration for menor ou igual à primeira, usa a primeira taxa
+    if not durations:
+        return 6.0 # Retorna um valor padrão se a curva estiver vazia
+
     if duration_anos <= durations[0]:
         return curva_ntnb[durations[0]]
-    # Se for maior ou igual à última, usa a última taxa
     if duration_anos >= durations[-1]:
         return curva_ntnb[durations[-1]]
         
-    # Encontra os pontos para interpolação
     for i in range(len(durations) - 1):
         if durations[i] <= duration_anos < durations[i+1]:
             x0, y0 = durations[i], curva_ntnb[durations[i]]
             x1, y1 = durations[i+1], curva_ntnb[durations[i+1]]
-            # Interpolação Linear
             return y0 + (y1 - y0) * (duration_anos - x0) / (x1 - x0)
 
     return 6.0 # Fallback
-
+    
 def obter_spread_credito(rating, duration_anos):
     """
     Simula uma matriz de spread de crédito. Retorna o spread em % (ex: 2.5 para 2.5%).
