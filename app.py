@@ -52,12 +52,17 @@ def inicializar_session_state():
             'saldo_devedor_carteira': 80_000_000.0, 'valor_garantias_carteira': 120_000_000.0, 'ltv_medio_carteira': 66.7,
             'origem': 'Padrão de mercado', 'inadimplencia': 1.2, 'vintage': 'Com leve deterioração', 'concentracao_top5': 6.0,
             'ivv_calculado': 6.67, 'vgv_vendido_perc': 60,
+            'adequacao_localizacao': 'Adequado',
+            'adequacao_renda': 'Adequado',
+            'adequacao_preco': 'Em linha com concorrentes',
+            'vendas_desconto': 'Não (ou com prêmio)',
 
             # Pilar 3
             'estrutura_tipo': 'Múltiplas Séries (com subordinação)', 'subordinacao': 10.0, 
             'waterfall': 'Padrão de mercado com alguma ambiguidade', 'fundo_reserva_pmts': 3.0, 'fundo_reserva_regra': True,
             'sobrecolateralizacao': 110.0, 'spread_excedente': 1.5, 'tipo_garantia': ['Alienação Fiduciária de Imóveis'], 
             'ltv_garantia': 60.0, 'liquidez_garantia': 'Média (ex: salas comerciais, loteamentos)',
+            'gatilhos_intervencao': [],
             
             # Pilar 4
             'independencia': 'Partes relacionadas com mitigação de conflitos', 'retencao_risco': True,
@@ -317,8 +322,18 @@ def calcular_score_lastro_projeto():
     map_praca = {"Capital / Metrópole": 5, "Cidade Grande (>500k hab)": 4, "Cidade Média (100-500k hab)": 3, "Cidade Pequena (<100k hab)": 2}
     map_micro = {"Nobre / Premium": 5, "Boa": 4, "Regular": 2, "Periférica / Risco": 1}
     map_segmento = {"Residencial Vertical": 5, "Residencial Horizontal (Condomínio)": 4, "Comercial (Salas/Lajes)": 3, "Loteamento": 2, "Multipropriedade": 1}
+    map_adequacao = {'Muito adequada': 5, 'Adequada': 4, 'Pouco adequada': 2, 'Inadequada': 1}
+    map_preco = {'Abaixo dos concorrentes': 5, 'Em linha com concorrentes': 4, 'Acima dos concorrentes': 2}
+    map_desconto = {'Não (ou com prêmio)': 5, 'Sim, descontos pontuais': 3, 'Sim, descontos agressivos e recorrentes': 1}
     score_localizacao = (map_praca[st.session_state.qualidade_municipio] + map_micro[st.session_state.microlocalizacao]) / 2
-    score_viabilidade = (score_localizacao * 0.7) + (map_segmento[st.session_state.segmento_projeto] * 0.3)
+    scores_viabilidade.append(map_praca[st.session_state.qualidade_municipio])
+    scores_viabilidade.append(map_micro[st.session_state.microlocalizacao])
+    scores_viabilidade.append(map_segmento[st.session_state.segmento_projeto])
+    scores_viabilidade.append(map_adequacao[st.session_state.adequacao_localizacao])
+    scores_viabilidade.append(map_adequacao[st.session_state.adequacao_renda])
+    scores_viabilidade.append(map_preco[st.session_state.adequacao_preco])
+    scores_viabilidade.append(map_desconto[st.session_state.vendas_desconto])
+    score_viabilidade = sum(scores_viabilidade) / len(scores_viabilidade)
     unid_ofertadas = st.session_state.unidades_ofertadas_inicio_mes
     ivv_calculado = (st.session_state.unidades_vendidas_mes / unid_ofertadas) * 100 if unid_ofertadas > 0 else 0
     st.session_state.ivv_calculado = ivv_calculado
@@ -390,6 +405,13 @@ def calcular_score_estrutura():
     if spread > 3: scores_reforco.append(5)
     elif spread >= 1: scores_reforco.append(3)
     else: scores_reforco.append(1)
+    num_gatilhos = len(st.session_state.gatilhos_intervencao)
+    if num_gatilhos >= 2:
+        scores_reforco.append(5)
+    elif num_gatilhos == 1:
+        scores_reforco.append(3)
+    else:
+        scores_reforco.append(1)
     score_reforco = sum(scores_reforco) / len(scores_reforco)
     scores_garantias = []
     map_tipo_garantia = {"Alienação Fiduciária de Imóveis": 5, "Cessão Fiduciária de Recebíveis": 4, "Fiança ou Aval": 2, "Sem garantia real (Fidejussória)": 1}
@@ -534,6 +556,31 @@ def gerar_fluxo_projeto(ss):
     except Exception as e:
         st.error(f"Erro ao gerar fluxo do projeto: {e}")
         return pd.DataFrame()
+
+def calcular_duration(df_fluxo, taxa_yield_anual):
+    """Calcula a Macaulay Duration em anos."""
+    try:
+        taxa_yield_mensal = (1 + taxa_yield_anual / 100)**(1/12) - 1
+        # O fluxo de caixa total para o investidor é a soma de juros e amortização
+        df_fluxo['FluxoTotal'] = df_fluxo['Juros Recebidos'] + df_fluxo['Amortização Recebida']
+        
+        # Numerador da fórmula do Duration
+        soma_pv_ponderado_tempo = sum(
+            (t / 12) * cf / (1 + taxa_yield_mensal)**t
+            for t, cf in zip(df_fluxo['Mês'], df_fluxo['FluxoTotal'])
+        )
+        
+        # Denominador (preço do título ou VPL)
+        soma_pv = sum(
+            cf / (1 + taxa_yield_mensal)**t
+            for t, cf in zip(df_fluxo['Mês'], df_fluxo['FluxoTotal'])
+        )
+        
+        if soma_pv == 0: return 0.0
+        
+        return soma_pv_ponderado_tempo / soma_pv
+    except Exception:
+        return 0.0
 
 @st.cache_data
 def run_cashflow_simulation(cenario_premissas, saldo_lastro, saldo_cri_p5, taxa_lastro, taxa_cri_p5, prazo, despesas):
@@ -711,9 +758,13 @@ with tab2:
             with c1:
                 st.selectbox("Segmento do Projeto:", ["Residencial Vertical", "Residencial Horizontal (Condomínio)", "Comercial (Salas/Lajes)", "Loteamento", "Multipropriedade"], key='segmento_projeto')
                 st.selectbox("Qualidade do Município:", ["Capital / Metrópole", "Cidade Grande (>500k hab)", "Cidade Média (100-500k hab)", "Cidade Pequena (<100k hab)"], key='qualidade_municipio')
+                st.selectbox("Adequação da localização ao padrão do empreendimento:", options=['Muito adequada', 'Adequada', 'Pouco adequada', 'Inadequada'], key='adequacao_localizacao')
+                st.selectbox("Adequação da renda/adensamento local ao produto:", options=['Muito adequada', 'Adequada', 'Pouco adequada', 'Inadequada'], key='adequacao_renda')
             with c2:
                 st.selectbox("Qualidade da Microlocalização:", ["Nobre / Premium", "Boa", "Regular", "Periférica / Risco"], key='microlocalizacao')
                 st.text_input("Cidade/Estado para Mapa:", key='cidade_mapa', help="Ex: 'Rio de Janeiro, RJ'.")
+                st.selectbox("Preço por m² vs. concorrentes diretos:", options=['Abaixo dos concorrentes', 'Em linha com concorrentes', 'Acima dos concorrentes'], key='adequacao_preco')
+                st.selectbox("Vendas realizadas tiveram desconto relevante sobre a tabela?", options=['Não (ou com prêmio)', 'Sim, descontos pontuais', 'Sim, descontos agressivos e recorrentes'], key='vendas_desconto')
         
         with st.expander("Fator 2: Performance Comercial (Peso: 40%)"):
             c1, c2, c3 = st.columns(3)
@@ -794,6 +845,12 @@ with tab3:
         st.checkbox("O Fundo de Reserva possui mecanismo de recomposição obrigatória?", key='fundo_reserva_regra')
         st.number_input("Índice de Sobrecolateralização (%)", key='sobrecolateralizacao')
         st.number_input("Spread Excedente anualizado (%)", key='spread_excedente')
+        st.multiselect(
+            "Gatilhos de Intervenção Contratual:",
+            options=["Amortização extraordinária por performance", "Aporte de garantia adicional", "Substituição de recebíveis", "Venda forçada de estoque"],
+            key='gatilhos_intervencao',
+            help="Cláusulas que forçam ações para proteger o investidor caso a operação performe mal."
+        )
     with st.expander("Fator 3: Qualidade das Garantias (Peso: 30%)"):
         st.multiselect("Selecione todos os tipos de garantia presentes na estrutura:", options=["Alienação Fiduciária de Imóveis", "Cessão Fiduciária de Recebíveis", "Fiança ou Aval", "Sem garantia real (Fidejussória)"], key='tipo_garantia')
         st.number_input("LTV Médio Ponderado das garantias (%)", key='ltv_garantia')
@@ -840,6 +897,7 @@ with tab4:
 with tab5:
     st.header("📊 Pilar 5: Modelagem Financeira e Teste de Estresse")
     st.markdown("Esta seção é o motor quantitativo da análise. Modele o fluxo de caixa do lastro para, em seguida, validar a resiliência da estrutura através de testes de estresse.")
+    st.number_input("Taxa de Desconto / Yield da Operação (% a.a.)", 1.0, 30.0, 15.0, 0.5, key='modelagem_yield', help="Utilizada para calcular o valor presente dos fluxos e o Duration.")
     tipo_modelagem = st.radio("Selecione a natureza do lastro para modelagem:", ('Projeto (Desenvolvimento Imobiliário)', 'Carteira de Recebíveis (Crédito Pulverizado)'), key="tipo_modelagem_p5", horizontal=True)
     st.divider()
     if tipo_modelagem == 'Projeto (Desenvolvimento Imobiliário)':
@@ -909,6 +967,9 @@ with tab5:
             df = st.session_state.fluxo_modelado_df
             st.area_chart(df.set_index('Mês')[['Juros Recebidos', 'Amortização Recebida']])
             st.line_chart(df.set_index('Mês')[['Saldo Devedor']])
+        df = st.session_state.fluxo_modelado_df
+        duration_anos = calcular_duration(df.copy(), st.session_state.modelagem_yield)
+        st.metric("Macaulay Duration (Anos)", f"{duration_anos:.2f} anos")
     st.divider()
     st.subheader("Validação da Estrutura: Teste de Estresse")
     st.markdown("Após modelar o cenário base, utilize esta seção para estressar as premissas e testar a resiliência.")
