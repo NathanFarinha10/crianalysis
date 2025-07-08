@@ -52,8 +52,8 @@ def inicializar_session_state():
             'saldo_devedor_carteira': 80_000_000.0, 'valor_garantias_carteira': 120_000_000.0, 'ltv_medio_carteira': 66.7,
             'origem': 'Padrão de mercado', 'inadimplencia': 1.2, 'vintage': 'Com leve deterioração', 'concentracao_top5': 6.0,
             'ivv_calculado': 6.67, 'vgv_vendido_perc': 60,
-            'adequacao_localizacao': 'Adequado',
-            'adequacao_renda': 'Adequado',
+            'adequacao_localizacao': 'Adequada',
+            'adequacao_renda': 'Adequada',
             'adequacao_preco': 'Em linha com concorrentes',
             'vendas_desconto': 'Não (ou com prêmio)',
 
