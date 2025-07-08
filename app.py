@@ -637,6 +637,68 @@ def calcular_payback(df_fluxo_caixa):
     except ValueError:
         return "Não atinge"
 
+# Adicione estas funções
+
+def obter_taxa_livre_risco(duration_anos):
+    """
+    Simula a busca da taxa de uma NTN-B para uma dada duration,
+    usando interpolação linear em uma curva de juros de exemplo.
+    """
+    # Curva de Juros de Exemplo (Duration em Anos, Taxa em % a.a.)
+    # Em um ambiente real, estes dados viriam de uma fonte de mercado (ex: Anbima, Bloomberg)
+    curva_ntnb = {
+        0.5: 5.80,
+        1.0: 5.90,
+        2.0: 6.00,
+        3.0: 6.10,
+        5.0: 6.25,
+        10.0: 6.50,
+        20.0: 6.60
+    }
+    
+    durations = sorted(curva_ntnb.keys())
+    
+    # Se a duration for menor ou igual à primeira, usa a primeira taxa
+    if duration_anos <= durations[0]:
+        return curva_ntnb[durations[0]]
+    # Se for maior ou igual à última, usa a última taxa
+    if duration_anos >= durations[-1]:
+        return curva_ntnb[durations[-1]]
+        
+    # Encontra os pontos para interpolação
+    for i in range(len(durations) - 1):
+        if durations[i] <= duration_anos < durations[i+1]:
+            x0, y0 = durations[i], curva_ntnb[durations[i]]
+            x1, y1 = durations[i+1], curva_ntnb[durations[i+1]]
+            # Interpolação Linear
+            return y0 + (y1 - y0) * (duration_anos - x0) / (x1 - x0)
+
+    return 6.0 # Fallback
+
+def obter_spread_credito(rating, duration_anos):
+    """
+    Simula uma matriz de spread de crédito. Retorna o spread em % (ex: 2.5 para 2.5%).
+    O spread aumenta para ratings piores e durations mais longas.
+    """
+    # Matriz de Spread [Rating] -> (Duration Limite, Spread Base)
+    matriz_spread = {
+        'brAAA(sf)': [(3, 0.8), (7, 1.2), (99, 1.5)],
+        'brAA(sf)':  [(3, 1.2), (7, 1.6), (99, 2.0)],
+        'brA(sf)':   [(3, 1.8), (7, 2.2), (99, 2.8)],
+        'brBBB(sf)': [(3, 2.5), (7, 3.0), (99, 3.5)],
+        'brBB(sf)':  [(3, 4.0), (7, 4.8), (99, 5.5)],
+        'brB(sf)':   [(3, 6.0), (7, 7.0), (99, 8.0)],
+        'brCCC(sf)': [(3, 9.0), (7, 10.5), (99, 12.0)],
+    }
+    
+    spreads = matriz_spread.get(rating, [(99, 15.0)]) # Fallback para ratings não encontrados
+    
+    for duration_limite, spread in spreads:
+        if duration_anos <= duration_limite:
+            return spread
+            
+    return 15.0 # Fallback
+
 @st.cache_data
 def run_cashflow_simulation(cenario_premissas, saldo_lastro, saldo_cri_p5, taxa_lastro, taxa_cri_p5, prazo, despesas):
     taxa_inadimplencia_aa = cenario_premissas['inadimplencia'] / 100
@@ -692,7 +754,7 @@ st.divider() # Adiciona uma linha divisória para um visual mais limpo
 
 inicializar_session_state()
 
-tab0, tab1, tab2, tab3, tab4, tab5, tab7, tab6 = st.tabs(["📝 Cadastro", "Pilar 1", "Pilar 2", "Pilar 3", "Pilar 4", "📊 Modelagem", "Viabilidade", "Resultado"])
+tab0, tab1, tab2, tab3, tab4, tab5, tab7, tab8, tab6 = st.tabs(["📝 Cadastro", "Pilar 1", "Pilar 2", "Pilar 3", "Pilar 4", "📊 Modelagem", "Viabilidade", "💰 Precificação", "Resultado"])
 
 with tab0:
     st.header("Informações Gerais da Operação (Folha de Rosto)")
@@ -1212,3 +1274,65 @@ with tab7:
 
     else:
         st.info("A Análise de Viabilidade do Empreendimento se aplica apenas ao modelo de 'Desenvolvimento Imobiliário'.")
+
+
+with tab8:
+    st.header("💰 Precificação Indicativa do CRI")
+    
+    # Verifica se os passos anteriores foram concluídos
+    if 'pilar4' not in st.session_state.scores:
+        st.warning("⬅️ Por favor, calcule os ratings nos pilares anteriores e modele o fluxo de caixa para precificar a operação.")
+    elif st.session_state.fluxo_modelado_df.empty:
+        st.warning("⬅️ Por favor, execute a modelagem do fluxo de caixa na aba '📊 Modelagem' para calcular o Duration.")
+    else:
+        st.info("As taxas abaixo são calculadas com base no rating final da série sênior e na duration da operação, usando uma curva de juros e matriz de spread simuladas.")
+
+        # 1. Obter os dados necessários
+        rating_final_senior = ajustar_rating(
+            converter_score_para_rating(sum(st.session_state.scores.get(p, 1) * w for p, w in {'pilar1': 0.2, 'pilar2': 0.3, 'pilar3': 0.3, 'pilar4': 0.2}.items())),
+            st.session_state.ajuste_final
+        )
+        
+        # Usa o fluxo de caixa correto dependendo do modelo para calcular o duration
+        if st.session_state.tipo_modelagem_p5 == 'Projeto (Desenvolvimento Imobiliário)':
+            coluna_fluxo_duration = 'Obrigações do CRI'
+        else: # Carteira de Recebíveis
+            st.session_state.fluxo_modelado_df['FluxoTotal'] = st.session_state.fluxo_modelado_df['Juros Recebidos'] + st.session_state.fluxo_modelado_df['Amortização Recebida']
+            coluna_fluxo_duration = 'FluxoTotal'
+            
+        duration_op = calcular_duration(st.session_state.fluxo_modelado_df, coluna_fluxo_duration, st.session_state.modelagem_yield)
+
+        # 2. Calcular a precificação da Série Sênior
+        taxa_ref = obter_taxa_livre_risco(duration_op)
+        spread_senior = obter_spread_credito(rating_final_senior, duration_op)
+        taxa_final_senior = taxa_ref + spread_senior
+
+        # 3. Calcular a precificação da Série Subordinada (se aplicável)
+        if st.session_state.estrutura_tipo == "Múltiplas Séries (com subordinação)":
+            rating_sub = ajustar_rating(rating_final_senior, -4)
+            spread_sub = obter_spread_credito(rating_sub, duration_op)
+            taxa_final_sub = taxa_ref + spread_sub
+        else:
+            taxa_final_sub = None
+
+        st.divider()
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("Precificação da Série Sênior")
+            st.metric("Rating Final da Série", rating_final_senior)
+            st.metric("Duration da Operação", f"{duration_op:.2f} anos")
+            st.metric(f"Taxa NTN-B ({duration_op:.2f} anos)", f"{taxa_ref:.2f}% a.a.")
+            st.metric("Spread de Crédito Exigido", f"{spread_senior:.2f}%")
+            st.success(f"**Taxa Indicativa (Sênior): IPCA + {taxa_final_senior:.2f}% a.a.**")
+            
+        with col2:
+            if taxa_final_sub:
+                st.subheader("Precificação da Série Subordinada")
+                st.metric("Rating Indicativo da Série", rating_sub)
+                st.metric("Duration da Operação", f"{duration_op:.2f} anos")
+                st.metric(f"Taxa NTN-B ({duration_op:.2f} anos)", f"{taxa_ref:.2f}% a.a.")
+                st.metric("Spread de Crédito Exigido", f"{spread_sub:.2f}%")
+                st.warning(f"**Taxa Indicativa (Subordinada): IPCA + {taxa_final_sub:.2f}% a.a.**")
+            else:
+                st.subheader("Precificação da Série Subordinada")
+                st.info("Não aplicável para operações de Série Única.")
