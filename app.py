@@ -1317,11 +1317,8 @@ with tab6:
 with tab7:
     st.header("Análise de Viabilidade Financeira do Empreendimento")
 
-    # A análise só é válida para o modelo de Projeto
-    # DEPOIS
     if st.session_state.tipo_modelagem_p5 == 'Projeto (Desenvolvimento Imobiliário)':
         
-        # Verifica se a modelagem já foi executada na aba anterior
         if 'fluxo_modelado_df' not in st.session_state or st.session_state.fluxo_modelado_df.empty:
             st.warning("⬅️ Por favor, execute a modelagem na aba '📊 Modelagem' primeiro para ver os resultados de viabilidade.")
         else:
@@ -1329,27 +1326,21 @@ with tab7:
             
             df_fluxo = st.session_state.fluxo_modelado_df
             
-            # Input para a Taxa Mínima de Atratividade (TMA)
             st.slider("Taxa Mínima de Atratividade (TMA) (% a.a.)", 
                       min_value=5.0, max_value=30.0, 
                       key='viabilidade_tma', step=0.5,
                       help="Custo de oportunidade ou retorno mínimo exigido pelo empreendedor.")
 
-            # --- Cálculos dos Indicadores ---
-            
-            # Fluxo de Caixa do Projeto = Receitas de Vendas - Desembolso da Obra
-            # O primeiro valor precisa ser negativo para os cálculos de VPL/TIR
-            fluxo_de_caixa_projeto = (df_fluxo['Receita de Vendas'] - df_fluxo['Desembolso da Obra']).tolist()
+            # --- CORREÇÃO APLICADA AQUI ---
+            fluxo_de_caixa_projeto = (df_fluxo['Receita de Vendas (Cedida ao CRI)'] - df_fluxo['Desembolso da Obra']).tolist()
             investimento_inicial = st.session_state.proj_custo_obra
-            # Adicionamos o investimento total como o fluxo no momento zero
             fluxo_de_caixa_vpl_tir = [-investimento_inicial] + fluxo_de_caixa_projeto
             
             vpl = calcular_vpl(st.session_state.viabilidade_tma, fluxo_de_caixa_vpl_tir)
             tir = calcular_tir(fluxo_de_caixa_vpl_tir)
             
-            # Payback usa o fluxo de caixa sem o investimento inicial explícito no começo
             df_payback = pd.DataFrame({'Fluxo': fluxo_de_caixa_projeto})
-            df_payback.index += 1 # Ajusta o índice para começar em 1 (mês 1)
+            df_payback.index += 1
             payback = calcular_payback(df_payback['Fluxo'])
             
             lucro_bruto_projeto = st.session_state.proj_vgv_total - st.session_state.proj_custo_obra
@@ -1364,10 +1355,10 @@ with tab7:
             col3.metric("Payback Simples", f"{payback} meses" if isinstance(payback, int) else payback)
             col4.metric("Margem Bruta do Empreendedor", f"{margem_bruta:.2f}%")
 
-            # Gráfico do Fluxo de Caixa Acumulado
             st.divider()
             st.subheader("Fluxo de Caixa Acumulado do Projeto")
-            df_fluxo['Fluxo Acumulado'] = (df_fluxo['Receita de Vendas'] - df_fluxo['Desembolso da Obra']).cumsum()
+            # --- CORREÇÃO APLICADA AQUI ---
+            df_fluxo['Fluxo Acumulado'] = (df_fluxo['Receita de Vendas (Cedida ao CRI)'] - df_fluxo['Desembolso da Obra']).cumsum()
             st.area_chart(df_fluxo.set_index('Mês')[['Fluxo Acumulado']])
             st.caption("O Payback ocorre no momento em que a linha do gráfico cruza o eixo zero.")
 
