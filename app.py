@@ -56,6 +56,8 @@ def inicializar_session_state():
             'adequacao_renda': 'Adequada',
             'adequacao_preco': 'Em linha com concorrentes',
             'vendas_desconto': 'Não (ou com prêmio)',
+            'data_analise': datetime.date.today(),
+            'data_entrega_prevista': datetime.date(2026, 12, 31),
 
             # Pilar 3
             'estrutura_tipo': 'Múltiplas Séries (com subordinação)', 'subordinacao': 10.0, 
@@ -325,16 +327,80 @@ def calcular_score_financeiro():
         else: scores.append(1)
     return sum(scores) / len(scores) if scores else 1
 
+def _calcular_performance_relativa(percentual_real, percentual_esperado):
+    """Calcula uma pontuação de 1 a 5 comparando o progresso real com o esperado."""
+    if percentual_esperado == 0:
+        return 5 # Se nada era esperado, qualquer progresso é ótimo.
+        
+    ratio = percentual_real / percentual_esperado
+    
+    if ratio >= 1.1: return 5   # Adiantado
+    elif ratio >= 0.9: return 4 # No prazo
+    elif ratio >= 0.7: return 3 # Atraso leve
+    elif ratio >= 0.5: return 2 # Atraso significativo
+    else: return 1              # Atraso severo
+
 def calcular_score_lastro_projeto():
-    # --- Fator 1: Viabilidade de Mercado (COM A NOVA LÓGICA) ---
-    scores_viabilidade = []
+    # 1. CALCULAR MÉTRICAS DE TEMPO
+    try:
+        prazo_total_dias = (st.session_state.data_entrega_prevista - st.session_state.op_data_lancamento_projeto).days
+        dias_decorridos = (st.session_state.data_analise - st.session_state.op_data_lancamento_projeto).days
+        
+        if prazo_total_dias <= 0: prazo_total_dias = 1 # Evitar divisão por zero
+        
+        percentual_tempo_decorrido = (dias_decorridos / prazo_total_dias) * 100
+        # Para simplificar, assumimos uma expectativa linear de progresso e vendas.
+        # Uma versão mais avançada usaria uma "Curva S".
+        percentual_esperado = max(0, min(100, percentual_tempo_decorrido))
+
+    except (TypeError, AttributeError):
+        percentual_esperado = 50.0 # Fallback em caso de erro de data
+
+    # 2. FATOR VIABILIDADE DE MERCADO (sem alterações na lógica interna)
+    # ... (código existente para calcular score_viabilidade) ...
+
+    # 3. FATOR PERFORMANCE COMERCIAL (LÓGICA REATORADA)
+    scores_comercial = []
+    # A velocidade de vendas do último mês continua sendo um indicador de momento
+    unid_ofertadas = st.session_state.unidades_ofertadas_inicio_mes
+    ivv_calculado = (st.session_state.unidades_vendidas_mes / unid_ofertadas) * 100 if unid_ofertadas > 0 else 0
+    st.session_state.ivv_calculado = ivv_calculado
+    if ivv_calculado > 7: score_ivv = 5
+    elif ivv_calculado >= 4: score_ivv = 3
+    else: score_ivv = 1
+    scores_comercial.append(score_ivv)
+    
+    # NOVO: Score de ritmo de vendas (Real vs. Esperado)
+    vgv_vendido_perc = st.session_state.vgv_vendido_perc
+    score_ritmo_vendas = _calcular_performance_relativa(vgv_vendido_perc, percentual_esperado)
+    scores_comercial.append(score_ritmo_vendas)
+
+    score_comercial = sum(scores_comercial) / len(scores_comercial)
+
+    # 4. FATOR RISCO DE EXECUÇÃO (LÓGICA REFATORADA)
+    scores_execucao = []
+    # A aderência qualitativa ao cronograma continua válida
+    map_cronograma = {"Adiantado ou no prazo": 5, "Atraso leve (< 3 meses)": 4, "Atraso significativo (3-6 meses)": 2, "Atraso severo (> 6 meses)": 1}
+    scores_execucao.append(map_cronograma[st.session_state.cronograma])
+    
+    # NOVO: Score de avanço físico (Real vs. Esperado)
+    avanco_fisico_obra = st.session_state.avanco_fisico_obra
+    score_ritmo_obra = _calcular_performance_relativa(avanco_fisico_obra, percentual_esperado)
+    scores_execucao.append(score_ritmo_obra)
+
+    score_execucao = sum(scores_execucao) / len(scores_execucao)
+    
+    # --- Cálculo final ponderado ---
+    # O cálculo de score_viabilidade foi omitido acima por brevidade, mas deve ser mantido como antes.
+    # Recalculando-o aqui para garantir que a função esteja completa:
     map_praca = {"Capital / Metrópole": 5, "Cidade Grande (>500k hab)": 4, "Cidade Média (100-500k hab)": 3, "Cidade Pequena (<100k hab)": 2}
     map_micro = {"Nobre / Premium": 5, "Boa": 4, "Regular": 2, "Periférica / Risco": 1}
     map_segmento = {"Residencial Vertical": 5, "Residencial Horizontal (Condomínio)": 4, "Comercial (Salas/Lajes)": 3, "Loteamento": 2, "Multipropriedade": 1}
     map_adequacao = {'Muito adequada': 5, 'Adequada': 4, 'Pouco adequada': 2, 'Inadequada': 1}
     map_preco = {'Abaixo dos concorrentes': 5, 'Em linha com concorrentes': 4, 'Acima dos concorrentes': 2}
     map_desconto = {'Não (ou com prêmio)': 5, 'Sim, descontos pontuais': 3, 'Sim, descontos agressivos e recorrentes': 1}
-
+    
+    scores_viabilidade = []
     scores_viabilidade.append(map_praca[st.session_state.qualidade_municipio])
     scores_viabilidade.append(map_micro[st.session_state.microlocalizacao])
     scores_viabilidade.append(map_segmento[st.session_state.segmento_projeto])
@@ -342,32 +408,8 @@ def calcular_score_lastro_projeto():
     scores_viabilidade.append(map_adequacao[st.session_state.adequacao_renda])
     scores_viabilidade.append(map_preco[st.session_state.adequacao_preco])
     scores_viabilidade.append(map_desconto[st.session_state.vendas_desconto])
-    
     score_viabilidade = sum(scores_viabilidade) / len(scores_viabilidade)
-
-    # --- Fator 2: Performance Comercial (Lógica original recuperada e invertida) ---
-    unid_ofertadas = st.session_state.unidades_ofertadas_inicio_mes
-    ivv_calculado = (st.session_state.unidades_vendidas_mes / unid_ofertadas) * 100 if unid_ofertadas > 0 else 0
-    st.session_state.ivv_calculado = ivv_calculado
-    if ivv_calculado > 7: score_ivv = 5
-    elif ivv_calculado >= 4: score_ivv = 3
-    else: score_ivv = 1
-        
-    vgv_vendido_perc = st.session_state.vgv_vendido_perc
-    if vgv_vendido_perc > 70: score_vgv_vendido = 5
-    elif vgv_vendido_perc > 40: score_vgv_vendido = 3
-    else: score_vgv_vendido = 1
-    score_comercial = (score_ivv + score_vgv_vendido) / 2
     
-    # --- Fator 3: Risco de Execução (Lógica original recuperada e invertida) ---
-    map_cronograma = {"Adiantado ou no prazo": 5, "Atraso leve (< 3 meses)": 4, "Atraso significativo (3-6 meses)": 2, "Atraso severo (> 6 meses)": 1}
-    avanco_obra = st.session_state.avanco_fisico_obra
-    if avanco_obra >= 90: score_avanco = 5
-    elif avanco_obra >= 50: score_avanco = 3
-    else: score_avanco = 1
-    score_execucao = (map_cronograma[st.session_state.cronograma] + score_avanco) / 2
-    
-    # --- Cálculo final ponderado ---
     return (score_viabilidade * 0.25) + (score_comercial * 0.40) + (score_execucao * 0.35)
 
 def calcular_score_lastro_carteira():
@@ -832,6 +874,11 @@ with tab2:
     st.header("Pilar 2: Análise do Lastro")
     st.markdown("Peso no Scorecard Mestre: **30%**")
     st.radio("Selecione a natureza do lastro:",('Desenvolvimento Imobiliário (Risco de Projeto)', 'Carteira de Recebíveis (Risco de Crédito)'), key="tipo_lastro", horizontal=True)
+    col_data1, col_data2 = st.columns(2)
+    with col_data1:
+        st.date_input("Data da Análise (Data Base)", key='data_analise')
+    with col_data2:
+        st.date_input("Data Prevista para Entrega da Obra", key='data_entrega_prevista')
     st.divider()
 
     if st.session_state.tipo_lastro == 'Desenvolvimento Imobiliário (Risco de Projeto)':
