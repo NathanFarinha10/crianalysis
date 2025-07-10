@@ -91,8 +91,10 @@ def inicializar_session_state():
             'viabilidade_tma': 15.0,
 
             # Precificação
-           'precificacao_ntnb': 6.25,
-            
+  
+            'precificacao_ipca_proj': 4.5,
+            'precificacao_cdi_proj': 10.25,
+              
             # Resultado Final
             'ajuste_final': 0, 'justificativa_final': ''
         }
@@ -1382,18 +1384,17 @@ with tab7:
 
 # SUBSTITUA o conteúdo da aba 8 inteiro por este:
 
+# SUBSTITUA o conteúdo da aba 8 inteiro por este:
+
 with tab8:
     st.header("💰 Precificação Indicativa do CRI")
     
-    # Verifica se os passos anteriores foram concluídos
-    if 'pilar4' not in st.session_state.scores:
-        st.warning("⬅️ Por favor, calcule os ratings nos pilares anteriores e modele o fluxo de caixa para precificar a operação.")
-    elif st.session_state.fluxo_modelado_df.empty:
-        st.warning("⬅️ Por favor, execute a modelagem do fluxo de caixa na aba '📊 Modelagem' para calcular o Duration.")
+    if 'pilar4' not in st.session_state.scores or st.session_state.fluxo_modelado_df.empty:
+        st.warning("⬅️ Por favor, calcule todos os pilares e modele o fluxo de caixa para precificar a operação.")
     else:
-        st.info("A precificação abaixo é calculada somando um spread de crédito (baseado no rating e duration) a uma taxa de referência (NTN-B) inserida manualmente.")
+        st.info("As taxas abaixo são calculadas com base no rating, duration e nas suas premissas macroeconômicas.")
 
-        # 1. Obter os dados necessários da análise
+        # 1. Coleta de dados da análise
         rating_final_senior = ajustar_rating(
             converter_score_para_rating(sum(st.session_state.scores.get(p, 1) * w for p, w in {'pilar1': 0.2, 'pilar2': 0.3, 'pilar3': 0.3, 'pilar4': 0.2}.items())),
             st.session_state.ajuste_final
@@ -1408,45 +1409,52 @@ with tab8:
         duration_op = calcular_duration(st.session_state.fluxo_modelado_df, coluna_fluxo_duration, st.session_state.modelagem_yield)
 
         st.divider()
+        st.subheader("Parâmetros Macroeconômicos e de Referência")
         
-        # 2. NOVO INPUT MANUAL PARA A TAXA DE REFERÊNCIA
-        st.subheader("Parâmetros de Precificação")
-        taxa_ref = st.number_input(
-            f"Taxa da NTN-B para Duration Equivalente ({duration_op:.2f} anos) (% a.a.):",
-            min_value=0.0, max_value=20.0, key='precificacao_ntnb', step=0.01,
-            help="Insira aqui a taxa de juros (yield) do título público com prazo mais próximo ao duration da operação."
-        )
-
-        # 3. Calcular a precificação da Série Sênior
+        col_param1, col_param2, col_param3 = st.columns(3)
+        with col_param1:
+            taxa_ref = st.number_input(f"Taxa NTN-B ({duration_op:.2f} anos)", key='precificacao_ntnb', step=0.01)
+        with col_param2:
+            ipca_proj_input = st.number_input("Projeção de IPCA Anual (%)", key='precificacao_ipca_proj', step=0.1)
+        with col_param3:
+            cdi_proj_input = st.number_input("Projeção de CDI Anual (%)", key='precificacao_cdi_proj', step=0.1)
+            
+        # 2. Cálculo da Precificação da Série Sênior
         spread_senior = obter_spread_credito(rating_final_senior, duration_op)
-        taxa_final_senior = taxa_ref + spread_senior
+        taxa_final_ipca_senior = taxa_ref + spread_senior
+        
+        # Cálculo da equivalência em CDI
+        retorno_nominal_senior = (1 + taxa_final_ipca_senior / 100) * (1 + ipca_proj_input / 100) - 1
+        taxa_perc_cdi_senior = (retorno_nominal_senior / (cdi_proj_input / 100)) * 100 if cdi_proj_input > 0 else 0
 
-        # 4. Calcular a precificação da Série Subordinada (se aplicável)
+        # 3. Cálculo da Precificação da Série Subordinada
+        taxa_final_ipca_sub, taxa_perc_cdi_sub, rating_sub = None, None, None
         if st.session_state.estrutura_tipo == "Múltiplas Séries (com subordinação)":
             rating_sub = ajustar_rating(rating_final_senior, -4)
             spread_sub = obter_spread_credito(rating_sub, duration_op)
-            taxa_final_sub = taxa_ref + spread_sub
-        else:
-            taxa_final_sub = None
+            taxa_final_ipca_sub = taxa_ref + spread_sub
+            retorno_nominal_sub = (1 + taxa_final_ipca_sub / 100) * (1 + ipca_proj_input / 100) - 1
+            taxa_perc_cdi_sub = (retorno_nominal_sub / (cdi_proj_input / 100)) * 100 if cdi_proj_input > 0 else 0
 
         st.divider()
+        st.subheader("Resultados da Precificação")
+        
         col1, col2 = st.columns(2)
         with col1:
-            st.subheader("Precificação da Série Sênior")
-            st.metric("Rating Final da Série", rating_final_senior)
-            st.metric("Duration da Operação", f"{duration_op:.2f} anos")
-            st.metric(f"Taxa de Referência (NTN-B)", f"{taxa_ref:.2f}% a.a.")
-            st.metric("Spread de Crédito Exigido", f"{spread_senior:.2f}%")
-            st.success(f"**Taxa Indicativa (Sênior): IPCA + {taxa_final_senior:.2f}% a.a.**")
+            with st.container(border=True):
+                st.markdown(f"<h5>Precificação da Série Sênior ({rating_final_senior})</h5>", unsafe_allow_html=True)
+                st.text(f"Taxa de Referência (NTN-B): {taxa_ref:.2f}%")
+                st.text(f"Spread de Crédito Exigido: {spread_senior:.2f}%")
+                st.success(f"**Taxa Indicativa: IPCA + {taxa_final_ipca_senior:.2f}% a.a.**")
+                st.info(f"**Taxa Equivalente: {taxa_perc_cdi_senior:.1f}% do CDI**")
             
         with col2:
-            if taxa_final_sub:
-                st.subheader("Precificação da Série Subordinada")
-                st.metric("Rating Indicativo da Série", rating_sub)
-                st.metric("Duration da Operação", f"{duration_op:.2f} anos")
-                st.metric(f"Taxa de Referência (NTN-B)", f"{taxa_ref:.2f}% a.a.")
-                st.metric("Spread de Crédito Exigido", f"{spread_sub:.2f}%")
-                st.warning(f"**Taxa Indicativa (Subordinada): IPCA + {taxa_final_sub:.2f}% a.a.**")
-            else:
-                st.subheader("Precificação da Série Subordinada")
-                st.info("Não aplicável para operações de Série Única.")
+            with st.container(border=True):
+                st.markdown(f"<h5>Precificação da Série Subordinada ({rating_sub if rating_sub else 'N/A'})</h5>", unsafe_allow_html=True)
+                if taxa_final_ipca_sub is not None:
+                    st.text(f"Taxa de Referência (NTN-B): {taxa_ref:.2f}%")
+                    st.text(f"Spread de Crédito Exigido: {spread_sub:.2f}%")
+                    st.warning(f"**Taxa Indicativa: IPCA + {taxa_final_ipca_sub:.2f}% a.a.**")
+                    st.info(f"**Taxa Equivalente: {taxa_perc_cdi_sub:.1f}% do CDI**")
+                else:
+                    st.info("Não aplicável para operações de Série Única.")
