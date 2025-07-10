@@ -1164,7 +1164,7 @@ with tab5:
         if 'fluxo_modelado_df' in st.session_state and not st.session_state.fluxo_modelado_df.empty:
             st.subheader("Resultados da Modelagem do Projeto")
             df = st.session_state.fluxo_modelado_df
-            st.line_chart(df.set_index('Mês')[['Receita de Vendas', 'Desembolso da Obra', 'Obrigações do CRI']])
+            st.line_chart(df.set_index('Mês')[['Receita de Vendas (Cedida ao CRI)', 'Desembolso da Obra', 'Obrigações do CRI']])
             st.area_chart(df.set_index('Mês')[['Fluxo de Caixa Líquido']])
             st.line_chart(df.set_index('Mês')[['Saldo Devedor CRI', 'Estoque Remanescente (VGV)']])
 
