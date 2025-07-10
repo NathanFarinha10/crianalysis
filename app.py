@@ -83,6 +83,9 @@ def inicializar_session_state():
             'prazo_p5': 60, 'despesas_p5': 10000.0, 'inad_base': 2.0, 'prep_base': 10.0, 'sev_base': 30, 'lag_base': 12,
             'inad_mod': 5.0, 'prep_mod': 5.0, 'sev_mod': 50, 'lag_mod': 18, 'inad_sev': 10.0, 'prep_sev': 2.0, 'sev_sev': 70, 'lag_sev': 24,
             'modelagem_yield': 12.0,
+            'venda_num_parcelas': 120,
+            'venda_perc_sinal': 10,
+            'venda_perc_cessao': 100,
 
             # Pilar 7
             'viabilidade_tma': 15.0,
@@ -565,56 +568,130 @@ def gerar_fluxo_carteira(ss):
         return pd.DataFrame()
 
 def gerar_fluxo_projeto(ss):
+    """
+    Gera um fluxo de caixa mais realista para um projeto, considerando uma carteira de recebíveis
+    de vendas já realizadas e a geração de novas vendas ao longo do tempo.
+    """
     try:
-        unidades_data = ss.proj_tipologias
-        df_unidades = pd.DataFrame()
-        if isinstance(unidades_data, pd.DataFrame):
-            df_unidades = unidades_data.copy().dropna(how='all')
-        elif isinstance(unidades_data, list):
-            unidades_data_limpa = [d for d in unidades_data if isinstance(d, dict) and d]
-            if unidades_data_limpa: df_unidades = pd.DataFrame(unidades_data_limpa)
-        elif isinstance(unidades_data, dict):
-            lista_de_linhas = list(unidades_data.values())
-            colunas = ['nome', 'area', 'estoque', 'vendidas', 'permutadas', 'preco_m2']
-            df_unidades = pd.DataFrame(lista_de_linhas, columns=colunas).dropna(how='all')
-        else:
-            st.error(f"Formato de dados da tabela de unidades não reconhecido: {type(unidades_data)}")
-            return pd.DataFrame()
+        # --- 1. PREPARAÇÃO DOS DADOS DE INPUT ---
+        df_unidades = pd.DataFrame(ss.proj_tipologias)
         if df_unidades.empty:
             st.warning("Adicione e configure pelo menos uma tipologia de unidade para modelar.")
             return pd.DataFrame()
-        colunas_necessarias = ['nome', 'area', 'estoque', 'vendidas', 'permutadas', 'preco_m2']
-        if not all(col in df_unidades.columns for col in colunas_necessarias):
-            st.error(f"Erro: A tabela de unidades não contém as colunas necessárias.")
-            return pd.DataFrame()
-        for col in ['estoque', 'area', 'preco_m2', 'vendidas', 'permutadas']: df_unidades[col] = pd.to_numeric(df_unidades[col])
+
+        for col in ['estoque', 'area', 'preco_m2', 'vendidas', 'permutadas']:
+            df_unidades[col] = pd.to_numeric(df_unidades[col])
+        
+        # Parâmetros do Projeto e do CRI
+        custo_total_obra = ss.proj_custo_obra
+        prazo_obra = int(ss.proj_prazo_obra)
+        ivv_projetado = ss.proj_ivv_projecao / 100
+        divida_total_cri = ss.op_volume
+        taxa_cri_aa = ss.op_taxa / 100
+        prazo_cri = int(ss.op_prazo)
+        taxa_cri_am = (1 + taxa_cri_aa)**(1/12) - 1
+
+        # Parâmetros das Vendas
+        num_parcelas_venda = int(ss.venda_num_parcelas)
+        perc_sinal = ss.venda_perc_sinal / 100
+        perc_cessao = ss.venda_perc_cessao / 100
+        
+        # --- 2. MODELAGEM DA CARTEIRA DE VENDAS JÁ REALIZADAS ---
+        df_unidades['VGV Vendido'] = df_unidades['vendidas'] * df_unidades['area'] * df_unidades['preco_m2']
+        vgv_ja_vendido = df_unidades['VGV Vendido'].sum()
+        
+        # Simplificação: Assume que a carteira existente tem um saldo devedor e prazo médio
+        # Uma versão mais complexa calcularia isso com base na data de cada venda
+        saldo_devedor_carteira_existente = vgv_ja_vendido * (1 - perc_sinal)
+        
+        # --- 3. MODELAGEM DO ESTOQUE PARA VENDAS FUTURAS ---
         df_unidades['VGV Estoque'] = df_unidades['estoque'] * df_unidades['area'] * df_unidades['preco_m2']
         estoque_vgv_inicial = df_unidades['VGV Estoque'].sum()
-        custo_total_obra, prazo_obra, ivv_projetado = ss.proj_custo_obra, int(ss.proj_prazo_obra), ss.proj_ivv_projecao / 100
-        divida_total_cri, taxa_cri_aa, prazo_cri = ss.op_volume, ss.op_taxa / 100, int(ss.op_prazo)
-        taxa_cri_am = (1 + taxa_cri_aa)**(1/12) - 1
-        fluxo, saldo_obra_a_desembolsar, estoque_vgv_atual, saldo_devedor_cri = [], custo_total_obra, estoque_vgv_inicial, divida_total_cri
-        for mes in range(1, prazo_cri + 1):
-            desembolso_obra, receita_vendas = 0, 0
+        
+        # --- 4. SIMULAÇÃO MÊS A MÊS ---
+        fluxo = []
+        saldo_obra_a_desembolsar = custo_total_obra
+        estoque_vgv_atual = estoque_vgv_inicial
+        saldo_devedor_cri = divida_total_cri
+        
+        # Dicionário para armazenar os novos financiamentos gerados
+        carteira_vendas_futuras = {}
+
+        for mes in range(1, prazo_cri + 2):
+            # A. ENTRADAS DE CAIXA
+            # A.1. Recebíveis da carteira pré-existente
+            if saldo_devedor_carteira_existente > 0:
+                pmt_existente = npf.pmt(taxa_cri_am, num_parcelas_venda, -saldo_devedor_carteira_existente)
+                juros_existente = saldo_devedor_carteira_existente * taxa_cri_am
+                amort_existente = pmt_existente - juros_existente
+                receita_carteira_existente = pmt_existente
+                saldo_devedor_carteira_existente -= amort_existente
+            else:
+                receita_carteira_existente = 0
+
+            # A.2. Geração e recebimento de novas vendas
+            receita_sinal_novas_vendas = 0
+            if estoque_vgv_atual > 0:
+                venda_do_mes = estoque_vgv_atual * ivv_projetado
+                vgv_vendido_este_mes = min(venda_do_mes, estoque_vgv_atual)
+                estoque_vgv_atual -= vgv_vendido_este_mes
+                
+                # Entrada de caixa do sinal
+                receita_sinal_novas_vendas = vgv_vendido_este_mes * perc_sinal
+                # Cria um novo financiamento para o saldo remanescente
+                novo_financiamento = vgv_vendido_este_mes * (1 - perc_sinal)
+                if novo_financiamento > 0:
+                    carteira_vendas_futuras[mes] = {'saldo': novo_financiamento, 'prazo_rem': num_parcelas_venda}
+
+            # A.3. Recebíveis da carteira de vendas futuras
+            receita_carteira_futura = 0
+            for mes_origem, financiamento in carteira_vendas_futuras.items():
+                if financiamento['saldo'] > 0 and financiamento['prazo_rem'] > 0:
+                    pmt_futuro = npf.pmt(taxa_cri_am, financiamento['prazo_rem'], -financiamento['saldo'])
+                    juros_futuro = financiamento['saldo'] * taxa_cri_am
+                    amort_futuro = pmt_futuro - juros_futuro
+                    receita_carteira_futura += pmt_futuro
+                    
+                    # Atualiza o saldo e o prazo do financiamento individual
+                    financiamento['saldo'] -= amort_futuro
+                    financiamento['prazo_rem'] -= 1
+
+            # Total de recebíveis gerados no mês
+            receita_total_bruta = receita_carteira_existente + receita_sinal_novas_vendas + receita_carteira_futura
+            # Caixa que efetivamente entra na conta do CRI
+            caixa_recebido_cri = receita_total_bruta * perc_cessao
+            
+            # B. SAÍDAS DE CAIXA
+            # B.1. Desembolso da Obra
+            desembolso_obra = 0
             if mes <= prazo_obra and saldo_obra_a_desembolsar > 0:
                 desembolso_mensal = custo_total_obra / prazo_obra
                 desembolso_obra = min(desembolso_mensal, saldo_obra_a_desembolsar)
                 saldo_obra_a_desembolsar -= desembolso_obra
-            if estoque_vgv_atual > 0:
-                venda_do_mes = estoque_vgv_atual * ivv_projetado
-                receita_vendas = min(venda_do_mes, estoque_vgv_atual)
-                estoque_vgv_atual -= receita_vendas
+
+            # B.2. Serviço da Dívida do CRI
             juros_cri = saldo_devedor_cri * taxa_cri_am
             amortizacao_cri = min(npf.pmt(taxa_cri_am, prazo_cri - mes + 1, -saldo_devedor_cri) - juros_cri, saldo_devedor_cri) if saldo_devedor_cri > 0 else 0
-            obrigacoes_totais = juros_cri + amortizacao_cri
-            caixa_liquido = receita_vendas - desembolso_obra - obrigacoes_totais
-            fluxo.append({"Mês": mes, "Receita de Vendas": receita_vendas, "Desembolso da Obra": desembolso_obra, "Obrigações do CRI": obrigacoes_totais, "Fluxo de Caixa Líquido": caixa_liquido, "Saldo Devedor CRI": saldo_devedor_cri - amortizacao_cri, "Estoque Remanescente (VGV)": estoque_vgv_atual})
+            obrigacoes_totais_cri = juros_cri + amortizacao_cri
+
+            # C. CONSOLIDAÇÃO DO FLUXO
+            caixa_liquido = caixa_recebido_cri - desembolso_obra - obrigacoes_totais_cri
+            
+            fluxo.append({
+                "Mês": mes, "Receita de Vendas (Cedida ao CRI)": caixa_recebido_cri, "Desembolso da Obra": desembolso_obra,
+                "Obrigações do CRI": obrigacoes_totais_cri, "Fluxo de Caixa Líquido": caixa_liquido,
+                "Saldo Devedor CRI": saldo_devedor_cri - amortizacao_cri, "Estoque Remanescente (VGV)": estoque_vgv_atual
+            })
+            
             saldo_devedor_cri -= amortizacao_cri
-            if saldo_devedor_cri < 1 and estoque_vgv_atual < 1 and saldo_obra_a_desembolsar < 1: break
+            if saldo_devedor_cri < 1 and estoque_vgv_atual < 1 and saldo_obra_a_desembolsar < 1:
+                break
+
         return pd.DataFrame(fluxo)
     except Exception as e:
         st.error(f"Erro ao gerar fluxo do projeto: {e}")
         return pd.DataFrame()
+
 
 def calcular_duration(df_fluxo, coluna_fluxo, taxa_yield_anual):
     """
@@ -1068,6 +1145,14 @@ with tab5:
                     st.session_state.proj_tipologias[i]['estoque'] = col_unid1.number_input(f"Unidades em Estoque", value=tipologia['estoque'], step=1, key=f"estoque_{i}")
                     st.session_state.proj_tipologias[i]['vendidas'] = col_unid2.number_input(f"Unidades Vendidas", value=tipologia['vendidas'], step=1, key=f"vendidas_{i}")
                     st.session_state.proj_tipologias[i]['permutadas'] = col_unid3.number_input(f"Unidades Permutadas", value=tipologia['permutadas'], step=1, key=f"permutadas_{i}")
+        with st.expander("Parâmetros de Recebíveis das Vendas", expanded=True):
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.number_input("Nº de Parcelas Padrão das Vendas", key='venda_num_parcelas', step=12)
+            with col2:
+                st.number_input("% de Sinal (Down Payment)", key='venda_perc_sinal')
+            with col3:
+                st.number_input("% de Cessão dos Recebíveis para o CRI", key='venda_perc_cessao', help="Qual porcentagem dos recebíveis gerados é cedida para a conta do CRI?")
         with st.expander("Projeção de Comercialização (Velocidade de Vendas)", expanded=True):
             st.slider("Velocidade de Vendas projetada (% do estoque/mês)", 0, 100, 5, key="proj_ivv_projecao")
         
