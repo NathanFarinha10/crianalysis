@@ -569,8 +569,9 @@ def gerar_fluxo_carteira(ss):
 
 def gerar_fluxo_projeto(ss):
     """
-    Gera um fluxo de caixa mais realista para um projeto, considerando uma carteira de recebíveis
-    de vendas já realizadas e a geração de novas vendas ao longo do tempo.
+    Gera um fluxo de caixa realista para um projeto, considerando uma carteira de recebíveis
+    de vendas já realizadas, a geração de novas vendas ao longo do tempo, e a possibilidade
+    de desligamento da dívida no fim da obra.
     """
     try:
         # --- 1. PREPARAÇÃO DOS DADOS DE INPUT ---
@@ -592,16 +593,16 @@ def gerar_fluxo_projeto(ss):
         taxa_cri_am = (1 + taxa_cri_aa)**(1/12) - 1
 
         # Parâmetros das Vendas
-        num_parcelas_venda = int(ss.venda_num_parcelas)
+        num_parcelas_venda = int(ss.venda_num_parcelas) if ss.venda_num_parcelas > 0 else 1
         perc_sinal = ss.venda_perc_sinal / 100
         perc_cessao = ss.venda_perc_cessao / 100
+        
+        # Parâmetro de Desligamento
+        desligamento_habilitado = ss.proj_desligamento_habilitado
         
         # --- 2. MODELAGEM DA CARTEIRA DE VENDAS JÁ REALIZADAS ---
         df_unidades['VGV Vendido'] = df_unidades['vendidas'] * df_unidades['area'] * df_unidades['preco_m2']
         vgv_ja_vendido = df_unidades['VGV Vendido'].sum()
-        
-        # Simplificação: Assume que a carteira existente tem um saldo devedor e prazo médio
-        # Uma versão mais complexa calcularia isso com base na data de cada venda
         saldo_devedor_carteira_existente = vgv_ja_vendido * (1 - perc_sinal)
         
         # --- 3. MODELAGEM DO ESTOQUE PARA VENDAS FUTURAS ---
@@ -614,20 +615,18 @@ def gerar_fluxo_projeto(ss):
         estoque_vgv_atual = estoque_vgv_inicial
         saldo_devedor_cri = divida_total_cri
         
-        # Dicionário para armazenar os novos financiamentos gerados
         carteira_vendas_futuras = {}
 
         for mes in range(1, prazo_cri + 2):
             # A. ENTRADAS DE CAIXA
             # A.1. Recebíveis da carteira pré-existente
+            receita_carteira_existente = 0
             if saldo_devedor_carteira_existente > 0:
                 pmt_existente = npf.pmt(taxa_cri_am, num_parcelas_venda, -saldo_devedor_carteira_existente)
                 juros_existente = saldo_devedor_carteira_existente * taxa_cri_am
                 amort_existente = pmt_existente - juros_existente
                 receita_carteira_existente = pmt_existente
                 saldo_devedor_carteira_existente -= amort_existente
-            else:
-                receita_carteira_existente = 0
 
             # A.2. Geração e recebimento de novas vendas
             receita_sinal_novas_vendas = 0
@@ -636,9 +635,7 @@ def gerar_fluxo_projeto(ss):
                 vgv_vendido_este_mes = min(venda_do_mes, estoque_vgv_atual)
                 estoque_vgv_atual -= vgv_vendido_este_mes
                 
-                # Entrada de caixa do sinal
                 receita_sinal_novas_vendas = vgv_vendido_este_mes * perc_sinal
-                # Cria um novo financiamento para o saldo remanescente
                 novo_financiamento = vgv_vendido_este_mes * (1 - perc_sinal)
                 if novo_financiamento > 0:
                     carteira_vendas_futuras[mes] = {'saldo': novo_financiamento, 'prazo_rem': num_parcelas_venda}
@@ -652,29 +649,35 @@ def gerar_fluxo_projeto(ss):
                     amort_futuro = pmt_futuro - juros_futuro
                     receita_carteira_futura += pmt_futuro
                     
-                    # Atualiza o saldo e o prazo do financiamento individual
                     financiamento['saldo'] -= amort_futuro
                     financiamento['prazo_rem'] -= 1
 
-            # Total de recebíveis gerados no mês
             receita_total_bruta = receita_carteira_existente + receita_sinal_novas_vendas + receita_carteira_futura
-            # Caixa que efetivamente entra na conta do CRI
             caixa_recebido_cri = receita_total_bruta * perc_cessao
             
             # B. SAÍDAS DE CAIXA
-            # B.1. Desembolso da Obra
             desembolso_obra = 0
             if mes <= prazo_obra and saldo_obra_a_desembolsar > 0:
-                desembolso_mensal = custo_total_obra / prazo_obra
+                desembolso_mensal = custo_total_obra / prazo_obra if prazo_obra > 0 else 0
                 desembolso_obra = min(desembolso_mensal, saldo_obra_a_desembolsar)
                 saldo_obra_a_desembolsar -= desembolso_obra
 
-            # B.2. Serviço da Dívida do CRI
+            # --- LÓGICA DE DESLIGAMENTO E SERVIÇO DA DÍVIDA ---
             juros_cri = saldo_devedor_cri * taxa_cri_am
-            amortizacao_cri = min(npf.pmt(taxa_cri_am, prazo_cri - mes + 1, -saldo_devedor_cri) - juros_cri, saldo_devedor_cri) if saldo_devedor_cri > 0 else 0
-            obrigacoes_totais_cri = juros_cri + amortizacao_cri
+            amortizacao_cri = 0
 
-            # C. CONSOLIDAÇÃO DO FLUXO
+            if desligamento_habilitado and mes == prazo_obra:
+                amortizacao_cri = saldo_devedor_cri
+            elif saldo_devedor_cri > 0:
+                pmt_cri = npf.pmt(taxa_cri_am, prazo_cri - mes + 1, -saldo_devedor_cri)
+                amortizacao_cri = min(pmt_cri - juros_cri, saldo_devedor_cri)
+
+            obrigacoes_totais_cri = juros_cri + amortizacao_cri
+            
+            if desligamento_habilitado and mes > prazo_obra:
+                caixa_recebido_cri = 0 # Zera o fluxo para o CRI após o desligamento
+            # --- FIM DA LÓGICA DE DESLIGAMENTO ---
+            
             caixa_liquido = caixa_recebido_cri - desembolso_obra - obrigacoes_totais_cri
             
             fluxo.append({
@@ -684,14 +687,15 @@ def gerar_fluxo_projeto(ss):
             })
             
             saldo_devedor_cri -= amortizacao_cri
-            if saldo_devedor_cri < 1 and estoque_vgv_atual < 1 and saldo_obra_a_desembolsar < 1:
+            if saldo_devedor_cri < 1:
+                if mes < prazo_cri + 1:
+                    fluxo.append({"Mês": mes + 1, "Receita de Vendas (Cedida ao CRI)":0, "Desembolso da Obra":0, "Obrigações do CRI":0, "Fluxo de Caixa Líquido":0, "Saldo Devedor CRI": 0, "Estoque Remanescente (VGV)": estoque_vgv_atual})
                 break
 
         return pd.DataFrame(fluxo)
     except Exception as e:
         st.error(f"Erro ao gerar fluxo do projeto: {e}")
         return pd.DataFrame()
-
 
 def calcular_duration(df_fluxo, coluna_fluxo, taxa_yield_anual):
     """
@@ -1106,7 +1110,17 @@ with tab5:
     st.header("📊 Pilar 5: Modelagem Financeira e Teste de Estresse")
     st.markdown("Esta seção é o motor quantitativo da análise. Modele o fluxo de caixa do lastro para, em seguida, validar a resiliência da estrutura através de testes de estresse.")
 
-    st.number_input("Taxa de Desconto / Yield da Operação (% a.a.)", 1.0, 30.0, key='modelagem_yield', step=0.5, help="Utilizada para calcular o valor presente dos fluxos e o Duration.")
+  
+
+    with st.expander("Parâmetros Avançados de Duration"):
+        st.number_input(
+        "Taxa de Desconto / Yield (% a.a.) para Cálculo do Duration",
+        1.0, 30.0,
+        value=st.session_state.op_taxa, # Usa a taxa do CRI como padrão
+        key='modelagem_yield',
+        step=0.5,
+        help="Por padrão, usamos a taxa do próprio CRI como referência. Altere este valor para simular o Duration sob diferentes cenários de yield de mercado."
+        )
 
     tipo_modelagem = st.radio("Selecione a natureza do lastro para modelagem:", ('Projeto (Desenvolvimento Imobiliário)', 'Carteira de Recebíveis (Crédito Pulverizado)'), key="tipo_modelagem_p5", horizontal=True)
     st.divider()
@@ -1128,7 +1142,8 @@ with tab5:
             with st.expander("Cronograma e Desembolso da Obra", expanded=True):
                 st.number_input("Prazo da Obra (meses)", key="proj_prazo_obra", step=1)
                 st.selectbox("Curva de Desembolso da Obra", ["Linear", "Curva 'S' Simplificada"], key="proj_curva_desembolso")
-                st.info("Modelo atual usa desembolso Linear.", icon="ℹ️")
+                st.info("Modelo atual usa desembolso Linear.", icon="ℹ️")  
+                st.checkbox("Habilitar 'Desligamento' da Dívida no Fim da Obra?", key='proj_desligamento_habilitado', value=True)
         with st.expander("Bolsão de Unidades e Status de Vendas", expanded=True):
             st.markdown("Adicione e configure cada tipo de unidade do empreendimento.")
             if st.button("Adicionar Nova Tipologia de Unidade", use_container_width=True):
