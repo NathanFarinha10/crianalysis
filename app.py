@@ -473,7 +473,7 @@ def calcular_score_estrutura():
         scores_reforco.append(1)
     score_reforco = sum(scores_reforco) / len(scores_reforco)
     scores_garantias = []
-    map_tipo_garantia = {"Alienação Fiduciária de Imóveis": 5, "Cessão Fiduciária de Recebíveis": 4, "Fiança ou Aval": 2, "Sem garantia real (Fidejussória)": 1}
+    map_tipo_garantia = {"Alienação Fiduciária de Imóveis": 5, "Cessão Fiduciária de Recebíveis": 4, "Garantias Adicionais Fora do Projeto": 4, "Alienação de Quotas": 3, "Fiança ou Aval": 2, "Sem garantia real (Fidejussória)": 1}
     garantias_selecionadas = st.session_state.tipo_garantia
     if not garantias_selecionadas: score_tipo = 1
     else:
@@ -983,7 +983,7 @@ with tab3:
             help="Cláusulas que forçam ações para proteger o investidor caso a operação performe mal."
         )
     with st.expander("Fator 3: Qualidade das Garantias (Peso: 30%)"):
-        st.multiselect("Selecione todos os tipos de garantia presentes na estrutura:", options=["Alienação Fiduciária de Imóveis", "Cessão Fiduciária de Recebíveis", "Fiança ou Aval", "Sem garantia real (Fidejussória)"], key='tipo_garantia')
+        st.multiselect("Selecione todos os tipos de garantia presentes na estrutura:", options=["Alienação Fiduciária de Imóveis", "Cessão Fiduciária de Recebíveis", "Garantias Adicionais Fora do Projeto", "Alienação de Quotas", "Fiança ou Aval", "Sem garantia real (Fidejussória)"], key='tipo_garantia', help="Selecione uma ou mais garantias. A combinação de múltiplas garantias robustas melhora a qualidade de crédito da operação.")
         st.number_input("LTV Médio Ponderado das garantias (%)", key='ltv_garantia')
         st.selectbox("Liquidez estimada da garantia", ["Alta (ex: aptos residenciais em capital)", "Média (ex: salas comerciais, loteamentos)", "Baixa (ex: imóvel de uso específico, rural)"], key='liquidez_garantia')
     if st.button("Calcular Score do Pilar 3", use_container_width=True):
