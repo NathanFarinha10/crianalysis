@@ -874,14 +874,16 @@ with tab2:
     st.header("Pilar 2: Análise do Lastro")
     st.markdown("Peso no Scorecard Mestre: **30%**")
     st.radio("Selecione a natureza do lastro:",('Desenvolvimento Imobiliário (Risco de Projeto)', 'Carteira de Recebíveis (Risco de Crédito)'), key="tipo_lastro", horizontal=True)
-    col_data1, col_data2 = st.columns(2)
-    with col_data1:
-        st.date_input("Data da Análise (Data Base)", key='data_analise')
-    with col_data2:
-        st.date_input("Data Prevista para Entrega da Obra", key='data_entrega_prevista')
     st.divider()
 
     if st.session_state.tipo_lastro == 'Desenvolvimento Imobiliário (Risco de Projeto)':
+        col_data1, col_data2 = st.columns(2)
+        with col_data1:
+            st.date_input("Data da Análise (Data Base)", key='data_analise')
+        with col_data2:
+            st.date_input("Data Prevista para Entrega da Obra", key='data_entrega_prevista')
+        
+        st.divider()
         with st.expander("Fator 1: Viabilidade de Mercado (Peso: 25%)", expanded=True):
             c1, c2 = st.columns(2)
             with c1:
