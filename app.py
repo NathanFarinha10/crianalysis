@@ -1365,7 +1365,6 @@ with tab7:
     else:
         st.info("A Análise de Viabilidade do Empreendimento se aplica apenas ao modelo de 'Desenvolvimento Imobiliário'.")
 
-
 # SUBSTITUA o conteúdo da aba 8 inteiro por este:
 
 with tab8:
