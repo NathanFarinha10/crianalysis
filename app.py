@@ -87,9 +87,6 @@ def inicializar_session_state():
             'venda_perc_sinal': 10,
             'venda_perc_cessao': 100,
 
-            # Pilar 7
-            'viabilidade_tma': 15.0,
-
             # Precificação
   
             'precificacao_cdi_proj': 10.25,
@@ -732,37 +729,6 @@ def calcular_duration(df_fluxo, coluna_fluxo, taxa_yield_anual):
     except Exception as e:
         st.error(f"Erro ao calcular o Duration: {e}")
         return 0.0
-
-
-def calcular_vpl(taxa_desconto_anual, fluxos_de_caixa):
-    """Calcula o Valor Presente Líquido (VPL) de uma série de fluxos de caixa."""
-    taxa_desconto_mensal = (1 + taxa_desconto_anual / 100)**(1/12) - 1
-    # O primeiro fluxo (investimento inicial) não é descontado no npv do numpy_financial
-    # Assumimos que o primeiro desembolso da obra é o investimento inicial.
-    # Para simplificar, vamos considerar o VPL de todo o fluxo.
-    try:
-        return npf.npv(taxa_desconto_mensal, fluxos_de_caixa)
-    except Exception:
-        return 0.0
-
-def calcular_tir(fluxos_de_caixa):
-    """Calcula a Taxa Interna de Retorno (TIR) mensal e a anualiza."""
-    try:
-        tir_mensal = npf.irr(fluxos_de_caixa)
-        # Anualiza a TIR mensal
-        return ((1 + tir_mensal) ** 12 - 1) * 100
-    except Exception:
-        return 0.0
-
-def calcular_payback(df_fluxo_caixa):
-    """Calcula o Payback Simples em meses."""
-    fluxo_cumulativo = df_fluxo_caixa.cumsum()
-    # Encontra o primeiro mês em que o fluxo cumulativo se torna positivo
-    try:
-        payback_mes = fluxo_cumulativo[fluxo_cumulativo >= 0].idxmax()
-        return payback_mes
-    except ValueError:
-        return "Não atinge"
     
 def obter_spread_credito(rating, duration_anos):
     """
@@ -843,7 +809,7 @@ st.divider() # Adiciona uma linha divisória para um visual mais limpo
 
 inicializar_session_state()
 
-tab0, tab1, tab2, tab3, tab4, tab5, tab7, tab8, tab6 = st.tabs(["Cadastro da Operação", "Devedor", "Lastro", "Estrutura e Garantias", "Jurídico e Governança", "Modelagem", "Viabilidade", "Precificação da Operação", "Resultado"])
+tab0, tab1, tab2, tab3, tab4, tab5, tab8, tab6 = st.tabs(["Cadastro da Operação", "Devedor", "Lastro", "Estrutura e Garantias", "Jurídico e Governança", "Modelagem", "Precificação da Operação", "Resultado"])
 
 with tab0:
     st.header("Informações Gerais da Operação")
@@ -1336,59 +1302,6 @@ with tab6:
         )
     else:
         st.warning("Calcule todos os pilares para habilitar o download do relatório.")
-
-with tab7:
-    st.header("Análise de Viabilidade Financeira do Empreendimento")
-
-    if st.session_state.tipo_modelagem_p5 == 'Projeto (Desenvolvimento Imobiliário)':
-        
-        if 'fluxo_modelado_df' not in st.session_state or st.session_state.fluxo_modelado_df.empty:
-            st.warning("⬅️ Por favor, execute a modelagem na aba '📊 Modelagem' primeiro para ver os resultados de viabilidade.")
-        else:
-            st.info("Esta análise considera a ótica do empreendedor, usando os fluxos de caixa do projeto (Receitas - Custos) e ignorando a estrutura de capital (dívida do CRI).")
-            
-            df_fluxo = st.session_state.fluxo_modelado_df
-            
-            st.slider("Taxa Mínima de Atratividade (TMA) (% a.a.)", 
-                      min_value=5.0, max_value=30.0, 
-                      key='viabilidade_tma', step=0.5,
-                      help="Custo de oportunidade ou retorno mínimo exigido pelo empreendedor.")
-
-            # --- CORREÇÃO APLICADA AQUI ---
-            fluxo_de_caixa_projeto = (df_fluxo['Receita de Vendas (Cedida ao CRI)'] - df_fluxo['Desembolso da Obra']).tolist()
-            investimento_inicial = st.session_state.proj_custo_obra
-            fluxo_de_caixa_vpl_tir = [-investimento_inicial] + fluxo_de_caixa_projeto
-            
-            vpl = calcular_vpl(st.session_state.viabilidade_tma, fluxo_de_caixa_vpl_tir)
-            tir = calcular_tir(fluxo_de_caixa_vpl_tir)
-            
-            df_payback = pd.DataFrame({'Fluxo': fluxo_de_caixa_projeto})
-            df_payback.index += 1
-            payback = calcular_payback(df_payback['Fluxo'])
-            
-            lucro_bruto_projeto = st.session_state.proj_vgv_total - st.session_state.proj_custo_obra
-            margem_bruta = (lucro_bruto_projeto / st.session_state.proj_vgv_total) * 100 if st.session_state.proj_vgv_total else 0
-
-            st.divider()
-            st.subheader("Indicadores de Viabilidade")
-            
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("VPL (Valor Presente Líquido)", f"R$ {vpl:,.2f}")
-            col2.metric("TIR (Taxa Interna de Retorno)", f"{tir:.2f}% a.a.")
-            col3.metric("Payback Simples", f"{payback} meses" if isinstance(payback, int) else payback)
-            col4.metric("Margem Bruta do Empreendedor", f"{margem_bruta:.2f}%")
-
-            st.divider()
-            st.subheader("Fluxo de Caixa Acumulado do Projeto")
-            # --- CORREÇÃO APLICADA AQUI ---
-            df_fluxo['Fluxo Acumulado'] = (df_fluxo['Receita de Vendas (Cedida ao CRI)'] - df_fluxo['Desembolso da Obra']).cumsum()
-            st.area_chart(df_fluxo.set_index('Mês')[['Fluxo Acumulado']])
-            st.caption("O Payback ocorre no momento em que a linha do gráfico cruza o eixo zero.")
-
-    else:
-        st.info("A Análise de Viabilidade do Empreendimento se aplica apenas ao modelo de 'Desenvolvimento Imobiliário'.")
-
-
 
 with tab8:
     st.header("💰 Precificação Indicativa do CRI")
