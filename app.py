@@ -1510,6 +1510,8 @@ with tab8:
 
 # COLE ESTE BLOCO DE CÓDIGO NO FINAL DO SEU ARQUIVO
 
+# COLE ESTE BLOCO DE CÓDIGO NO FINAL DO SEU ARQUIVO
+
 with tab_metodologia:
     st.header("Metodologia e Documentação da Plataforma")
     st.markdown("""
@@ -1518,7 +1520,7 @@ with tab_metodologia:
 
     st.subheader("1. Arquitetura do Rating: O Scorecard Mestre")
     st.markdown("""
-    [cite_start]A metodologia é implementada através de um sistema de scorecards ponderados para garantir consistência. [cite: 38] [cite_start]A análise é dividida em quatro pilares principais e um pilar de validação quantitativa. [cite: 40, 44] [cite_start]A ponderação reflete a filosofia de que, em uma securitização bem estruturada, o risco primário deve ser o do lastro e da própria estrutura da operação. [cite: 45, 46, 47]
+    A metodologia é implementada através de um sistema de scorecards ponderados para garantir consistência. A análise é dividida em quatro pilares principais e um pilar de validação quantitativa. A ponderação reflete a filosofia de que, em uma securitização bem estruturada, o risco primário deve ser o do lastro e da própria estrutura da operação.
 
     - **Pilar 1: Análise do Originador / Devedor** (Peso: 20%)
     - **Pilar 2: Análise do Lastro** (Peso: 30%)
@@ -1526,68 +1528,68 @@ with tab_metodologia:
     - **Pilar 4: Análise Jurídica e de Governança da Operação** (Peso: 20%)
     - **Pilar 5: Modelagem e Teste de Estresse** (Fator de Validação Quantitativa)
 
-    [cite_start]Cada pilar recebe uma pontuação de 1 (pior) a 5 (melhor), que é então ponderada para gerar um score final que, por sua vez, é convertido em uma nota de rating (ex: `brA(sf)`). [cite: 22, 349]
+    Cada pilar recebe uma pontuação de 1 (pior) a 5 (melhor), que é então ponderada para gerar um score final que, por sua vez, é convertido em uma nota de rating (ex: `brA(sf)`).
     """)
 
     st.subheader("2. Detalhamento dos Pilares de Análise")
 
     with st.expander("Pilar 1: Risco do Originador/Devedor (Peso: 20%)"):
         st.markdown("""
-        [cite_start]Avalia a capacidade financeira, a competência operacional e a integridade da entidade que origina os créditos. [cite: 52] [cite_start]Um originador de baixa qualidade tende a gerar ativos de maior risco, que serão o lastro do CRI. [cite: 54]
+        Avalia a capacidade financeira, a competência operacional e a integridade da entidade que origina os créditos. Um originador de baixa qualidade tende a gerar ativos de maior risco, que serão o lastro do CRI.
 
         - **Fatores Analisados (Pesos atualizados):**
-            - **1. [cite_start]Governança e Reputação (20% do pilar):** Analisa o histórico de emissões, identificação de UBOs, políticas de compliance, qualidade da auditoria, litígios e riscos ESG. [cite: 64]
-            - **2. [cite_start]Histórico Operacional (40% do pilar):** Avalia a experiência em projetos similares, reputação com clientes, histórico de entrega de projetos e qualidade da política de crédito. [cite: 67, 68]
+            - **1. Governança e Reputação (20% do pilar):** Analisa o histórico de emissões, identificação de UBOs, políticas de compliance, qualidade da auditoria, litígios e riscos ESG.
+            - **2. Histórico Operacional (40% do pilar):** Avalia a experiência em projetos similares, reputação com clientes, histórico de entrega de projetos e qualidade da política de crédito.
             - **3. Saúde Financeira (40% do pilar):**
-                - [cite_start]**Análise Corporativa:** Foca em indicadores como Dívida Líquida/EBITDA, Liquidez Corrente e FCO/Dívida. [cite: 81, 84, 88]
+                - **Análise Corporativa:** Foca em indicadores como Dívida Líquida/EBITDA, Liquidez Corrente e FCO/Dívida.
                 - **Análise de Projeto (SPE):** Foca em métricas do empreendimento, como LTV do Projeto, Cobertura de Custo da Obra e Cobertura da Dívida por Vendas.
         """)
 
     with st.expander("Pilar 2: Risco do Lastro (Peso: 30%)"):
         st.markdown("""
-        [cite_start]O coração da análise, avaliando a qualidade e a capacidade de geração de caixa dos ativos que garantem a operação. [cite: 100, 101] [cite_start]A plataforma se divide em dois módulos, conforme o tipo de lastro. [cite: 107]
+        O coração da análise, avaliando a qualidade e a capacidade de geração de caixa dos ativos que garantem a operação. A plataforma se divide em dois módulos, conforme o tipo de lastro.
 
         - **Módulo A: Desenvolvimento Imobiliário (Risco de Projeto)**
             - **Fatores Analisados:** Viabilidade de Mercado (25%), Performance Comercial (40%) e Risco de Execução (35%).
-            - [cite_start]**Métricas-Chave:** IVV (Índice de Velocidade de Vendas), avanço físico da obra, aderência ao cronograma, e adequação do produto ao mercado local. [cite: 126, 129]
+            - **Métricas-Chave:** IVV (Índice de Velocidade de Vendas), avanço físico da obra, aderência ao cronograma, e adequação do produto ao mercado local.
 
         - **Módulo B: Carteira de Recebíveis (Risco de Crédito) (Pesos atualizados)**
             - **Fatores Analisados:** Qualidade da Carteira (45%), Performance Histórica (45%) e Concentração (10%).
-            - [cite_start]**Métricas-Chave:** LTV médio, qualidade da originação [cite: 143][cite_start], inadimplência histórica [cite: 159][cite_start], safras (vintage analysis) [cite: 157] [cite_start]e concentração nos maiores devedores. [cite: 151, 152]
+            - **Métricas-Chave:** LTV médio, qualidade da originação, inadimplência histórica, safras (vintage analysis) e concentração nos maiores devedores.
         """)
 
     with st.expander("Pilar 3: Estrutura e Mecanismos de Reforço (Peso: 30%)"):
         st.markdown("""
-        [cite_start]Analisa como a operação está montada para proteger o investidor, distribuindo fluxos de caixa e absorvendo perdas. [cite: 174, 175] [cite_start]Uma estrutura robusta pode elevar a qualidade de crédito de um CRI. [cite: 176]
+        Analisa como a operação está montada para proteger o investidor, distribuindo fluxos de caixa e absorvendo perdas. Uma estrutura robusta pode elevar a qualidade de crédito de um CRI.
 
         - **Fatores Analisados:**
-            - **1. [cite_start]Estrutura de Capital (40%):** Avalia o nível de **subordinação** e a clareza da **Cascata de Pagamentos (Waterfall)**. [cite: 183, 196]
-            - **2. [cite_start]Mecanismos de Reforço (30%):** Quantifica a proteção do Fundo de Reserva, **Sobrecolateralização** e Spread Excedente. [cite: 204, 207, 212]
-            - **3. [cite_start]Qualidade das Garantias (30%):** Analisa o tipo (ex: Alienação Fiduciária), o LTV e a liquidez das garantias. [cite: 216, 224, 228]
+            - **1. Estrutura de Capital (40%):** Avalia o nível de **subordinação** e a clareza da **Cascata de Pagamentos (Waterfall)**.
+            - **2. Mecanismos de Reforço (30%):** Quantifica a proteção do Fundo de Reserva, **Sobrecolateralização** e Spread Excedente.
+            - **3. Qualidade das Garantias (30%):** Analisa o tipo (ex: Alienação Fiduciária), o LTV e a liquidez das garantias.
         """)
 
     with st.expander("Pilar 4: Jurídico e Governança da Operação (Peso: 20%)"):
         st.markdown("""
-        [cite_start]Avalia a integridade dos contratos e a qualidade dos prestadores de serviço, com foco em mitigar conflitos de interesse. [cite: 237] [cite_start]Falhas de governança são frequentemente o "calcanhar de Aquiles" das operações estruturadas. [cite: 238, 243]
+        Avalia a integridade dos contratos e a qualidade dos prestadores de serviço, com foco em mitigar conflitos de interesse. Falhas de governança são frequentemente o "calcanhar de Aquiles" das operações estruturadas.
 
         - **Fatores Analisados:**
-            - **1. [cite_start]Conflitos de Interesse (50%):** Analisa a independência entre as partes e a retenção de risco pelo originador. [cite: 263, 265]
-            - **2. [cite_start]Qualidade dos Prestadores (30%):** Avalia a reputação e independência do Agente Fiduciário e da Securitizadora. [cite: 253, 256, 255]
-            - **3. [cite_start]Robustez Contratual (20%):** Mede a força dos Covenants e a qualidade dos pareceres e relatórios. [cite: 267, 271]
+            - **1. Conflitos de Interesse (50%):** Analisa a independência entre as partes e a retenção de risco pelo originador.
+            - **2. Qualidade dos Prestadores (30%):** Avalia a reputação e independência do Agente Fiduciário e da Securitizadora.
+            - **3. Robustez Contratual (20%):** Mede a força dos Covenants e a qualidade dos pareceres e relatórios.
         """)
 
     st.subheader("3. Validação e Etapas Finais")
 
     with st.expander("Pilar 5: Modelagem Financeira e Teste de Estresse"):
         st.markdown("""
-        [cite_start]Este pilar funciona como a prova de estresse da análise. [cite: 282]
+        Este pilar funciona como a prova de estresse da análise.
         - **Modelagem de Cenário Base:** A plataforma projeta um fluxo de caixa mensal detalhado para o lastro (Projeto ou Carteira).
-        - [cite_start]**Teste de Estresse:** A partir de inputs do lastro e do CRI, a ferramenta simula três cenários (Base, Moderado, Severo), alterando premissas de inadimplência, pré-pagamento e severidade de perda. [cite: 307, 309, 311] [cite_start]O objetivo é verificar a **Perda de Principal** para o investidor em cada cenário. [cite: 319]
+        - **Teste de Estresse:** A partir de inputs do lastro e do CRI, a ferramenta simula três cenários (Base, Moderado, Severo), alterando premissas de inadimplência, pré-pagamento e severidade de perda. O objetivo é verificar a **Perda de Principal** para o investidor em cada cenário.
         """)
 
     with st.expander("Precificação, Resultado Final e Relatório"):
         st.markdown("""
-        - [cite_start]**Precificação:** A plataforma calcula uma taxa de referência somando um **Spread de Crédito** (baseado no rating e duration) a um título público (NTN-B). [cite: 333]
-        - [cite_start]**Resultado Final:** As pontuações dos pilares são consolidadas no **Score Final Ponderado**, que é convertido para uma nota de rating. [cite: 349] [cite_start]A ferramenta permite um **Ajuste Qualitativo** final pelo analista para determinar o rating definitivo. [cite: 351, 353]
+        - **Precificação:** A plataforma calcula uma taxa de referência somando um **Spread de Crédito** (baseado no rating e duration) a um título público (NTN-B).
+        - **Resultado Final:** As pontuações dos pilares são consolidadas no **Score Final Ponderado**, que é convertido para uma nota de rating. A ferramenta permite um **Ajuste Qualitativo** final pelo analista para determinar o rating definitivo.
         - **Relatório PDF:** Todos os dados e análises são compilados em um relatório final para download.
         """)
