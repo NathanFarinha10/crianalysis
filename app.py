@@ -1619,9 +1619,49 @@ with tab_metodologia:
         - **Teste de Estresse:** A partir de inputs do lastro e do CRI, a ferramenta simula três cenários (Base, Moderado, Severo), alterando premissas de inadimplência, pré-pagamento e severidade de perda. O objetivo é verificar a **Perda de Principal** para o investidor em cada cenário.
         """)
 
+    # SUBSTITUA O EXPANDER DE PRECIFICAÇÃO ANTERIOR POR ESTE BLOCO COMPLETO
+
     with st.expander("Precificação, Resultado Final e Relatório"):
         st.markdown("""
-        - **Precificação:** A plataforma calcula uma taxa de referência somando um **Spread de Crédito** (baseado no rating e duration) a um título público (NTN-B).
+        - **Precificação:** A plataforma calcula uma taxa de referência para o CRI através de uma metodologia de **spread de crédito por componentes**, que busca refletir de forma mais precisa os múltiplos fatores de risco da operação.
+        """)
+    
+        st.info("A metodologia de Spread de Crédito é calculada da seguinte forma: Spread Total = Spread Base + Prêmio de Liquidez + Prêmio Estrutural + Ajuste de Prazo")
+        
+        st.markdown("""
+        Abaixo estão os detalhes de cada componente:
+        
+        **1. Spread Base (pelo Rating)**
+        É o ponto de partida, refletindo o risco de crédito intrínseco da nota atribuída. A plataforma utiliza a seguinte matriz de referência:
+        """)
+        
+        tabela_spread_md = """
+        | Rating     | Spread Base |
+        |:-----------|:------------|
+        | brAAA(sf)  | 1.20%       |
+        | brAA(sf)   | 1.60%       |
+        | brA(sf)    | 2.10%       |
+        | brBBB(sf)  | 2.80%       |
+        | brBB(sf)   | 4.50%       |
+        | brB(sf)    | 6.50%       |
+        | brCCC(sf)  | 9.00%       |
+        | *Fallback* | *12.00%* |
+        """
+        st.markdown(tabela_spread_md)
+    
+        st.markdown("""
+        **2. Prêmio de Liquidez (pelo Volume da Emissão)**
+        Operações com menor volume de emissão (`op_volume`) tendem a ter menor liquidez no mercado secundário, exigindo um prêmio de risco adicional para o investidor.
+        
+        **3. Prêmio Estrutural (pelo Risco do Lastro)**
+        O tipo de risco do lastro (`tipo_lastro`) impacta o spread. Um CRI de desenvolvimento (risco de obra e vendas) recebe um prêmio maior do que um CRI de uma carteira de recebíveis já performada (risco de crédito pulverizado).
+        
+        **4. Ajuste de Prazo (pela Duration)**
+        Um ajuste granular é aplicado com base na *Macaulay Duration* da operação. Um fator linear aumenta ou diminui o spread para operações com prazos mais longos ou mais curtos que a média de mercado.
+    
+        ---
+        A taxa final **(IPCA + Spread Total)** é então comparada com a curva de juros de referência (NTN-B e CDI) para se encontrar a taxa equivalente em CDI.
+        
         - **Resultado Final:** As pontuações dos pilares são consolidadas no **Score Final Ponderado**, que é convertido para uma nota de rating. A ferramenta permite um **Ajuste Qualitativo** final pelo analista para determinar o rating definitivo.
         - **Relatório PDF:** Todos os dados e análises são compilados em um relatório final para download.
         """)
