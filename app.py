@@ -837,7 +837,7 @@ with col1:
 
 with col2:
     st.title("Plataforma de Análise e Rating de CRI")
-    st.markdown("Highpar Asset Management")
+    st.markdown("**Highpar Asset Management**")
 
 st.divider() # Adiciona uma linha divisória para um visual mais limpo
 
