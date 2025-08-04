@@ -986,6 +986,7 @@ with tab1:
             st.checkbox("Política de crédito formalizada?", key='politica_formalizada')
    # SUBSTITUA o expander "Fator 3" inteiro por este:
 
+    # CÓDIGO NOVO (CORRIGIDO)
     with st.expander("Fator 3: Saúde Financeira (Peso: 40%)"):
         st.radio("Modalidade de análise:", 
              ('Análise Corporativa (Holding/Incorporadora)', 'Análise de Projeto (SPE)'), 
@@ -993,35 +994,36 @@ with tab1:
              horizontal=True)
     
         st.markdown("---")
-
-    if st.session_state.modalidade_financeira == 'Análise Corporativa (Holding/Incorporadora)':
-        c1, c2, c3 = st.columns(3)
-        with c1: st.number_input("Dívida Líquida / EBITDA", key='dl_ebitda', help="Mede a alavancagem. Idealmente abaixo de 3.0x para o setor.")
-        with c2: st.number_input("Liquidez Corrente", key='liq_corrente', help="Mede a capacidade de pagar dívidas de curto prazo. Idealmente acima de 1.2.")
-        with c3: st.number_input("FCO / Dívida Total (%)", key='fco_divida', help="Capacidade de pagar a dívida com o caixa gerado. Idealmente acima de 15-20%.")
         
-        st.markdown("##### Visualização dos Indicadores Corporativos")
-        df_chart = pd.DataFrame({"Valor": [st.session_state.dl_ebitda, st.session_state.liq_corrente], "Benchmark Ruim": [5.0, 0.8], "Benchmark Bom": [2.0, 1.5]}, index=["Dívida/EBITDA", "Liq. Corrente"])
-        st.bar_chart(df_chart)
-
-    else: # Análise de Projeto (SPE)
-        c1, c2 = st.columns(2)
-        with c1:
-            st.number_input("Dívida Total do Projeto (R$)", key='divida_projeto')
-            st.number_input("Custo Remanescente da Obra (R$)", key='custo_remanescente')
-            st.number_input("VGV já Vendido (R$)", key='vgv_vendido')
-        with c2:
-            st.number_input("VGV Total do Projeto (R$)", key='vgv_projeto')
-            st.number_input("Recursos Disponíveis para Obra (Caixa + CRI) (R$)", key='recursos_obra')
-            st.number_input("Saldo Devedor do CRI (R$)", key='sd_cri')
-
-        st.markdown("##### Visualização dos Indicadores do Projeto")
-        custo_rem = st.session_state.custo_remanescente
-        sd_cri = st.session_state.sd_cri
-        cobertura_obra_perc = (st.session_state.recursos_obra / custo_rem) if custo_rem > 0 else 0
-        cobertura_vendas_perc = (st.session_state.vgv_vendido / sd_cri) if sd_cri > 0 else 0
-        st.progress(min(cobertura_obra_perc, 1.0), text=f"Cobertura de Custo da Obra: {cobertura_obra_perc:.1%}")
-        st.progress(min(cobertura_vendas_perc, 1.0), text=f"Cobertura da Dívida por Vendas: {cobertura_vendas_perc:.1%}")
+        # O if/else agora está DENTRO do "with st.expander"
+        if st.session_state.modalidade_financeira == 'Análise Corporativa (Holding/Incorporadora)':
+            c1, c2, c3 = st.columns(3)
+            with c1: st.number_input("Dívida Líquida / EBITDA", key='dl_ebitda', help="Mede a alavancagem. Idealmente abaixo de 3.0x para o setor.")
+            with c2: st.number_input("Liquidez Corrente", key='liq_corrente', help="Mede a capacidade de pagar dívidas de curto prazo. Idealmente acima de 1.2.")
+            with c3: st.number_input("FCO / Dívida Total (%)", key='fco_divida', help="Capacidade de pagar a dívida com o caixa gerado. Idealmente acima de 15-20%.")
+            
+            st.markdown("##### Visualização dos Indicadores Corporativos")
+            df_chart = pd.DataFrame({"Valor": [st.session_state.dl_ebitda, st.session_state.liq_corrente], "Benchmark Ruim": [5.0, 0.8], "Benchmark Bom": [2.0, 1.5]}, index=["Dívida/EBITDA", "Liq. Corrente"])
+            st.bar_chart(df_chart)
+    
+        else: # Análise de Projeto (SPE)
+            c1, c2 = st.columns(2)
+            with c1:
+                st.number_input("Dívida Total do Projeto (R$)", key='divida_projeto')
+                st.number_input("Custo Remanescente da Obra (R$)", key='custo_remanescente')
+                st.number_input("VGV já Vendido (R$)", key='vgv_vendido')
+            with c2:
+                st.number_input("VGV Total do Projeto (R$)", key='vgv_projeto')
+                st.number_input("Recursos Disponíveis para Obra (Caixa + CRI) (R$)", key='recursos_obra')
+                st.number_input("Saldo Devedor do CRI (R$)", key='sd_cri')
+    
+            st.markdown("##### Visualização dos Indicadores do Projeto")
+            custo_rem = st.session_state.custo_remanescente
+            sd_cri = st.session_state.sd_cri
+            cobertura_obra_perc = (st.session_state.recursos_obra / custo_rem) if custo_rem > 0 else 0
+            cobertura_vendas_perc = (st.session_state.vgv_vendido / sd_cri) if sd_cri > 0 else 0
+            st.progress(min(cobertura_obra_perc, 1.0), text=f"Cobertura de Custo da Obra: {cobertura_obra_perc:.1%}")
+            st.progress(min(cobertura_vendas_perc, 1.0), text=f"Cobertura da Dívida por Vendas: {cobertura_vendas_perc:.1%}")
     if st.button("Calcular Score do Pilar 1", use_container_width=True):
         st.session_state.scores['pilar1'] = (calcular_score_governanca() * 0.3) + (calcular_score_operacional() * 0.3) + (calcular_score_financeiro() * 0.4)
         st.plotly_chart(create_gauge_chart(st.session_state.scores['pilar1'], "Score Ponderado (Pilar 1)"), use_container_width=True)
