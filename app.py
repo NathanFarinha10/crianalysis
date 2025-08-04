@@ -824,11 +824,12 @@ st.divider() # Adiciona uma linha divisória para um visual mais limpo
 
 inicializar_session_state()
 
-# Insira este bloco de código por volta da linha 760 do seu arquivo
+# SUBSTITUA O BLOCO ANTERIOR INTEIRAMENTE POR ESTE
 
 import json
+import datetime
 
-# --- INÍCIO DO BLOCO DE SALVAR/CARREGAR ---
+# --- INÍCIO DO BLOCO DE SALVAR/CARREGAR (VERSÃO CORRIGIDA) ---
 
 # Adiciona um cabeçalho e um divisor na barra lateral
 st.sidebar.title("Gestão da Análise")
@@ -836,12 +837,13 @@ st.sidebar.divider()
 
 # 1. LÓGICA DE CARREGAMENTO (UPLOAD)
 uploaded_file = st.sidebar.file_uploader(
-    "Carregar Análise Salva",
+    "1. Selecione a Análise Salva",
     type="json",
-    help="Selecione um arquivo .json de uma análise salva para preencher todos os campos."
+    help="Selecione um arquivo .json de uma análise salva para carregar os dados."
 )
 
-if uploaded_file is not None:
+# O botão de carregar só fica ativo se um arquivo for selecionado
+if st.sidebar.button("2. Carregar Dados do Arquivo", disabled=(uploaded_file is None), use_container_width=True):
     try:
         # Lê o conteúdo do arquivo
         file_contents = uploaded_file.read()
@@ -860,7 +862,8 @@ if uploaded_file is not None:
         
         st.sidebar.success("Análise carregada com sucesso!")
         
-        # Força um rerun para garantir que a UI reflita o estado carregado
+        # Força um rerun para garantir que a UI reflita o estado carregado.
+        # Como está dentro de um botão, só executa uma vez por clique.
         st.rerun()
 
     except Exception as e:
@@ -884,15 +887,17 @@ json_string = json.dumps(state_to_save, indent=4, default=str)
 # Extrai o nome do CRI para o nome do arquivo
 file_name = state_to_save.get('op_nome', 'analise_cri').replace(' ', '_') + ".json"
 
+st.sidebar.divider()
 st.sidebar.download_button(
    label="Salvar Análise Atual",
    data=json_string,
    file_name=file_name,
    mime="application/json",
-   help="Salva todos os inputs da análise atual em um arquivo .json no seu computador."
+   help="Salva todos os inputs da análise atual em um arquivo .json no seu computador.",
+   use_container_width=True
 )
 
-# --- FIM DO BLOCO DE SALVAR/CARREGAR ---
+# --- FIM DO BLOCO DE SALVAR/CARREGAR (VERSÃO CORRIGIDA) ---
 
 tab0, tab1, tab2, tab3, tab4, tab5, tab8, tab6 = st.tabs(["Cadastro da Operação", "Devedor", "Lastro", "Estrutura e Garantias", "Jurídico e Governança", "Modelagem", "Precificação da Operação", "Resultado"])
 
