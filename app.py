@@ -824,6 +824,76 @@ st.divider() # Adiciona uma linha divisória para um visual mais limpo
 
 inicializar_session_state()
 
+# Insira este bloco de código por volta da linha 760 do seu arquivo
+
+import json
+
+# --- INÍCIO DO BLOCO DE SALVAR/CARREGAR ---
+
+# Adiciona um cabeçalho e um divisor na barra lateral
+st.sidebar.title("Gestão da Análise")
+st.sidebar.divider()
+
+# 1. LÓGICA DE CARREGAMENTO (UPLOAD)
+uploaded_file = st.sidebar.file_uploader(
+    "Carregar Análise Salva",
+    type="json",
+    help="Selecione um arquivo .json de uma análise salva para preencher todos os campos."
+)
+
+if uploaded_file is not None:
+    try:
+        # Lê o conteúdo do arquivo
+        file_contents = uploaded_file.read()
+        loaded_state_dict = json.loads(file_contents)
+
+        # Restaura o estado a partir do dicionário carregado
+        for key, value in loaded_state_dict.items():
+            # CORREÇÃO CRÍTICA: Converte strings de data de volta para objetos date
+            if key in ['op_data_emissao', 'op_data_vencimento', 'op_data_lancamento_projeto', 'data_analise', 'data_entrega_prevista'] and isinstance(value, str):
+                st.session_state[key] = datetime.datetime.strptime(value, '%Y-%m-%d').date()
+            else:
+                st.session_state[key] = value
+        
+        # Garante que o estado seja reconhecido como inicializado
+        st.session_state.state_initialized = True
+        
+        st.sidebar.success("Análise carregada com sucesso!")
+        
+        # Força um rerun para garantir que a UI reflita o estado carregado
+        st.rerun()
+
+    except Exception as e:
+        st.sidebar.error(f"Erro ao carregar o arquivo: {e}")
+
+
+# 2. LÓGICA DE SALVAMENTO (DOWNLOAD)
+
+# Cria uma cópia do session_state como um dicionário comum
+state_to_save = {k: v for k, v in st.session_state.items()}
+
+# Remove chaves que não precisam ser salvas (são geradas em tempo de execução)
+keys_to_remove = ['state_initialized', 'resultados_pilar5', 'map_data', 'fluxo_modelado_df', 'editor_tipologias']
+for key in keys_to_remove:
+    state_to_save.pop(key, None) # O 'None' evita erros se a chave não existir
+
+# Converte o dicionário para uma string JSON formatada
+# O default=str é um truque para converter tipos não serializáveis (como 'date') em strings
+json_string = json.dumps(state_to_save, indent=4, default=str)
+
+# Extrai o nome do CRI para o nome do arquivo
+file_name = state_to_save.get('op_nome', 'analise_cri').replace(' ', '_') + ".json"
+
+st.sidebar.download_button(
+   label="Salvar Análise Atual",
+   data=json_string,
+   file_name=file_name,
+   mime="application/json",
+   help="Salva todos os inputs da análise atual em um arquivo .json no seu computador."
+)
+
+# --- FIM DO BLOCO DE SALVAR/CARREGAR ---
+
 tab0, tab1, tab2, tab3, tab4, tab5, tab8, tab6 = st.tabs(["Cadastro da Operação", "Devedor", "Lastro", "Estrutura e Garantias", "Jurídico e Governança", "Modelagem", "Precificação da Operação", "Resultado"])
 
 with tab0:
