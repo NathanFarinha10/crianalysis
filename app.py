@@ -86,6 +86,8 @@ def inicializar_session_state():
             'venda_num_parcelas': 120,
             'venda_perc_sinal': 10,
             'venda_perc_cessao': 100,
+            'venda_taxa_juros': 14.0,
+            'venda_prazo_remanescente': 108,
 
             # Precificação
   
@@ -590,10 +592,16 @@ def gerar_fluxo_projeto(ss):
         prazo_cri = int(ss.op_prazo)
         taxa_cri_am = (1 + taxa_cri_aa)**(1/12) - 1
 
-        # Parâmetros das Vendas
+        # Parâmetros das Vendas (COM NOVAS VARIÁVEIS)
         num_parcelas_venda = int(ss.venda_num_parcelas) if ss.venda_num_parcelas > 0 else 1
         perc_sinal = ss.venda_perc_sinal / 100
         perc_cessao = ss.venda_perc_cessao / 100
+        
+        # <<-- INÍCIO DA CORREÇÃO LÓGICA -->>
+        taxa_venda_aa = ss.venda_taxa_juros / 100 
+        taxa_venda_am = (1 + taxa_venda_aa)**(1/12) - 1
+        prazo_rem_existente = int(ss.venda_prazo_remanescente)
+        # <<-- FIM DA CORREÇÃO LÓGICA -->>
         
         # Parâmetro de Desligamento
         desligamento_habilitado = ss.proj_desligamento_habilitado
@@ -619,12 +627,16 @@ def gerar_fluxo_projeto(ss):
             # A. ENTRADAS DE CAIXA
             # A.1. Recebíveis da carteira pré-existente
             receita_carteira_existente = 0
-            if saldo_devedor_carteira_existente > 0:
-                pmt_existente = npf.pmt(taxa_cri_am, num_parcelas_venda, -saldo_devedor_carteira_existente)
-                juros_existente = saldo_devedor_carteira_existente * taxa_cri_am
+            if saldo_devedor_carteira_existente > 0 and prazo_rem_existente > 0:
+                # <<-- INÍCIO DA CORREÇÃO LÓGICA -->>
+                # Usa a taxa de VENDA e o prazo REMANESCENTE
+                pmt_existente = npf.pmt(taxa_venda_am, prazo_rem_existente, -saldo_devedor_carteira_existente) if taxa_venda_am > 0 else saldo_devedor_carteira_existente / prazo_rem_existente
+                juros_existente = saldo_devedor_carteira_existente * taxa_venda_am
                 amort_existente = pmt_existente - juros_existente
                 receita_carteira_existente = pmt_existente
                 saldo_devedor_carteira_existente -= amort_existente
+                prazo_rem_existente -= 1
+                # <<-- FIM DA CORREÇÃO LÓGICA -->>
 
             # A.2. Geração e recebimento de novas vendas
             receita_sinal_novas_vendas = 0
@@ -642,10 +654,13 @@ def gerar_fluxo_projeto(ss):
             receita_carteira_futura = 0
             for mes_origem, financiamento in carteira_vendas_futuras.items():
                 if financiamento['saldo'] > 0 and financiamento['prazo_rem'] > 0:
-                    pmt_futuro = npf.pmt(taxa_cri_am, financiamento['prazo_rem'], -financiamento['saldo'])
-                    juros_futuro = financiamento['saldo'] * taxa_cri_am
+                    # <<-- INÍCIO DA CORREÇÃO LÓGICA -->>
+                    # Usa a taxa de VENDA para calcular o PMT das novas vendas também
+                    pmt_futuro = npf.pmt(taxa_venda_am, financiamento['prazo_rem'], -financiamento['saldo']) if taxa_venda_am > 0 else financiamento['saldo'] / financiamento['prazo_rem']
+                    juros_futuro = financiamento['saldo'] * taxa_venda_am
                     amort_futuro = pmt_futuro - juros_futuro
                     receita_carteira_futura += pmt_futuro
+                    # <<-- FIM DA CORREÇÃO LÓGICA -->>
                     
                     financiamento['saldo'] -= amort_futuro
                     financiamento['prazo_rem'] -= 1
@@ -667,14 +682,14 @@ def gerar_fluxo_projeto(ss):
             if desligamento_habilitado and mes == prazo_obra:
                 amortizacao_cri = saldo_devedor_cri
             elif saldo_devedor_cri > 0:
-                pmt_cri = npf.pmt(taxa_cri_am, prazo_cri - mes + 1, -saldo_devedor_cri)
+                # O prazo remanescente do CRI é prazo_cri - mes + 1
+                pmt_cri = npf.pmt(taxa_cri_am, prazo_cri - mes + 1, -saldo_devedor_cri) if taxa_cri_am > 0 else saldo_devedor_cri / (prazo_cri - mes + 1)
                 amortizacao_cri = min(pmt_cri - juros_cri, saldo_devedor_cri)
 
             obrigacoes_totais_cri = juros_cri + amortizacao_cri
             
             if desligamento_habilitado and mes > prazo_obra:
-                caixa_recebido_cri = 0 # Zera o fluxo para o CRI após o desligamento
-            # --- FIM DA LÓGICA DE DESLIGAMENTO ---
+                obrigacoes_totais_cri = 0 # Zera a obrigação após o desligamento no modelo
             
             caixa_liquido = caixa_recebido_cri - desembolso_obra - obrigacoes_totais_cri
             
@@ -694,7 +709,7 @@ def gerar_fluxo_projeto(ss):
     except Exception as e:
         st.error(f"Erro ao gerar fluxo do projeto: {e}")
         return pd.DataFrame()
-
+        
 def calcular_duration(df_fluxo, coluna_fluxo, taxa_yield_anual):
     """
     Calcula a Macaulay Duration em anos a partir de um dataframe de fluxo de caixa.
@@ -1135,13 +1150,22 @@ with tab5:
             # que o restante da sua aplicação espera. O Streamlit cuida de todo o estado.
             st.session_state.proj_tipologias = edited_df.to_dict('records')
         with st.expander("Parâmetros de Recebíveis das Vendas", expanded=True):
+            st.markdown("##### Parâmetros para Novas Vendas")
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.number_input("Nº de Parcelas Padrão das Vendas", key='venda_num_parcelas', step=12)
+                st.number_input("Nº de Parcelas Padrão das Vendas", key='venda_num_parcelas', step=12, value=120)
             with col2:
-                st.number_input("% de Sinal (Down Payment)", key='venda_perc_sinal')
+                st.number_input("% de Sinal (Down Payment)", key='venda_perc_sinal', value=10)
             with col3:
-                st.number_input("% de Cessão dos Recebíveis para o CRI", key='venda_perc_cessao', help="Qual porcentagem dos recebíveis gerados é cedida para a conta do CRI?")
+                st.number_input("% de Cessão dos Recebíveis para o CRI", key='venda_perc_cessao', value=100, help="Qual porcentagem dos recebíveis gerados é cedida para a conta do CRI?")
+
+            st.divider()
+            st.markdown("##### Parâmetros da Carteira de Vendas Já Realizadas")
+            col4, col5 = st.columns(2)
+            with col4:
+                st.number_input("Taxa de Juros Média dos Contratos de Venda (% a.a.)", key='venda_taxa_juros', value=14.0, help="Taxa cobrada do cliente final no financiamento do imóvel.")
+            with col5:
+                st.number_input("Prazo Remanescente Médio das Vendas Existentes (meses)", key='venda_prazo_remanescente', value=108, help="Prazo que ainda falta para quitar a carteira já vendida.")
         with st.expander("Projeção de Comercialização (Velocidade de Vendas)", expanded=True):
             st.slider("Velocidade de Vendas projetada (% do estoque/mês)", 0, 100, 5, key="proj_ivv_projecao")
         
