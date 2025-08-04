@@ -1434,7 +1434,7 @@ with tab6:
         st.warning("Calcule todos os pilares para habilitar o download do relatório.")
 
 with tab8:
-    st.header("💰 Precificação Indicativa do CRI")
+    st.header("Precificação Indicativa do CRI")
     
     if 'pilar4' not in st.session_state.scores or st.session_state.fluxo_modelado_df.empty:
         st.warning("⬅️ Por favor, calcule todos os pilares e modele o fluxo de caixa para precificar a operação.")
