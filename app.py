@@ -1215,7 +1215,7 @@ with tab4:
         with st.container(border=True): st.markdown(st.session_state.analise_p4)
 
 with tab5:
-    st.header("📊 Pilar 5: Modelagem Financeira e Teste de Estresse")
+    st.header("Pilar 5: Modelagem Financeira e Teste de Estresse")
     st.markdown("Esta seção é o motor quantitativo da análise. Modele o fluxo de caixa do lastro para, em seguida, validar a resiliência da estrutura através de testes de estresse.")
 
     with st.expander("Parâmetros Avançados de Duration"):
