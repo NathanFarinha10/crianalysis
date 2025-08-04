@@ -782,8 +782,8 @@ def calcular_spread_credito_avancado(rating, duration_anos, op_volume, tipo_last
     """
     # 1. Spread Base (pelo Rating) - Tabela com valores mais realistas
     matriz_spread_base = {
-        'brAAA(sf)': 1.20, 'brAA(sf)':  1.60, 'brA(sf)':   2.10,
-        'brBBB(sf)': 2.80, 'brBB(sf)':  4.50, 'brB(sf)':   6.50,
+        'brAAA(sf)': 1.50, 'brAA(sf)':  2.10, 'brA(sf)':   2.80,
+        'brBBB(sf)': 3.60, 'brBB(sf)':  4.50, 'brB(sf)':   6.50,
         'brCCC(sf)': 9.00,
     }
     base_spread = matriz_spread_base.get(rating, 12.00) # Usa 12% como fallback
@@ -1638,10 +1638,10 @@ with tab_metodologia:
         tabela_spread_md = """
         | Rating     | Spread Base |
         |:-----------|:------------|
-        | brAAA(sf)  | 1.20%       |
-        | brAA(sf)   | 1.60%       |
-        | brA(sf)    | 2.10%       |
-        | brBBB(sf)  | 2.80%       |
+        | brAAA(sf)  | 1.50%       |
+        | brAA(sf)   | 2.10%       |
+        | brA(sf)    | 2.80%       |
+        | brBBB(sf)  | 3.60%       |
         | brBB(sf)   | 4.50%       |
         | brB(sf)    | 6.50%       |
         | brCCC(sf)  | 9.00%       |
