@@ -1111,8 +1111,6 @@ with tab5:
     st.header("📊 Pilar 5: Modelagem Financeira e Teste de Estresse")
     st.markdown("Esta seção é o motor quantitativo da análise. Modele o fluxo de caixa do lastro para, em seguida, validar a resiliência da estrutura através de testes de estresse.")
 
-  
-
     with st.expander("Parâmetros Avançados de Duration"):
         st.number_input(
         "Taxa de Desconto / Yield (% a.a.) para Cálculo do Duration",
@@ -1146,21 +1144,30 @@ with tab5:
                 st.info("Modelo atual usa desembolso Linear.", icon="ℹ️")  
                 st.checkbox("Habilitar 'Desligamento' da Dívida no Fim da Obra?", key='proj_desligamento_habilitado', value=True)
         with st.expander("Bolsão de Unidades e Status de Vendas", expanded=True):
-            st.markdown("Adicione e configure cada tipo de unidade do empreendimento.")
-            if st.button("Adicionar Nova Tipologia de Unidade", use_container_width=True):
-                nova_tipologia = {'nome': f'Nova Tipologia {len(st.session_state.proj_tipologias) + 1}', 'area': 70.0, 'estoque': 10, 'vendidas': 0, 'permutadas': 0, 'preco_m2': 10000.0}
-                st.session_state.proj_tipologias.append(nova_tipologia)
-            st.divider()
-            for i, tipologia in enumerate(st.session_state.proj_tipologias):
-                with st.container(border=True):
-                    col1, col2, col3 = st.columns([2, 1, 1])
-                    st.session_state.proj_tipologias[i]['nome'] = col1.text_input(f"Nome da Tipologia", value=tipologia['nome'], key=f"nome_{i}")
-                    st.session_state.proj_tipologias[i]['area'] = col2.number_input(f"Área Média (m²)", value=tipologia['area'], key=f"area_{i}")
-                    st.session_state.proj_tipologias[i]['preco_m2'] = col3.number_input(f"Preço/m² (R$)", value=tipologia['preco_m2'], key=f"preco_m2_{i}")
-                    col_unid1, col_unid2, col_unid3 = st.columns(3)
-                    st.session_state.proj_tipologias[i]['estoque'] = col_unid1.number_input(f"Unidades em Estoque", value=tipologia['estoque'], step=1, key=f"estoque_{i}")
-                    st.session_state.proj_tipologias[i]['vendidas'] = col_unid2.number_input(f"Unidades Vendidas", value=tipologia['vendidas'], step=1, key=f"vendidas_{i}")
-                    st.session_state.proj_tipologias[i]['permutadas'] = col_unid3.number_input(f"Unidades Permutadas", value=tipologia['permutadas'], step=1, key=f"permutadas_{i}")
+            # SUBSTITUA PELO NOVO BLOCO DE CÓDIGO
+            st.markdown("Adicione, edite ou remova as tipologias do empreendimento diretamente na tabela abaixo.")
+            
+            # O st.data_editor trabalha melhor com DataFrames.
+            df_tipologias = pd.DataFrame(st.session_state.proj_tipologias)
+            
+            edited_df = st.data_editor(
+                df_tipologias,
+                num_rows="dynamic", # Permite ao usuário adicionar e deletar linhas.
+                column_config={
+                    "nome": st.column_config.TextColumn("Nome da Tipologia", help="Ex: Apto Padrão, Cobertura", required=True),
+                    "area": st.column_config.NumberColumn("Área (m²)", format="%.2f", required=True),
+                    "estoque": st.column_config.NumberColumn("Un. Estoque", format="%d", required=True),
+                    "vendidas": st.column_config.NumberColumn("Un. Vendidas", format="%d", required=True),
+                    "permutadas": st.column_config.NumberColumn("Un. Permutadas", format="%d", required=True),
+                    "preco_m2": st.column_config.NumberColumn("Preço/m² (R$)", format="R$ %.2f", required=True),
+                },
+                use_container_width=True,
+                key="editor_tipologias" # Adicionar uma chave é uma boa prática
+            )
+            
+            # Ao final, convertemos o DataFrame editado de volta para o formato de lista de dicionários
+            # que o restante da sua aplicação espera. O Streamlit cuida de todo o estado.
+            st.session_state.proj_tipologias = edited_df.to_dict('records')
         with st.expander("Parâmetros de Recebíveis das Vendas", expanded=True):
             col1, col2, col3 = st.columns(3)
             with col1:
