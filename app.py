@@ -466,7 +466,7 @@ def calcular_score_lastro_carteira():
     if concentracao_top5 < 10: score_concentracao = 5
     elif concentracao_top5 <= 30: score_concentracao = 3
     else: score_concentracao = 1
-    return (score_qualidade * 0.40) + (score_performance * 0.40) + (score_concentracao * 0.20)
+    return (score_qualidade * 0.45) + (score_performance * 0.45) + (score_concentracao * 0.10)
 
 def calcular_score_estrutura():
     scores_capital = []
@@ -954,7 +954,7 @@ with tab0:
 with tab1:
     st.header("Pilar 1: Análise do Risco do Originador/Devedor")
     st.markdown("Peso no Scorecard Mestre: **20%**")
-    with st.expander("Fator 1: Governança e Reputação (Peso: 30%)", expanded=True):
+    with st.expander("Fator 1: Governança e Reputação (Peso: 20%)", expanded=True):
         c1, c2 = st.columns(2)
         with c1:
             st.selectbox("Histórico de emissões:", ["Emissor recorrente com bom histórico", "Poucas emissões ou histórico misto", "Primeira emissão", "Histórico negativo"], key='hist_emissor')
@@ -974,7 +974,7 @@ with tab1:
             st.selectbox("Risco Jurídico/Regulatório:", opcoes_risco, key='risco_juridico')
             st.selectbox("Risco Ambiental:", opcoes_risco, key='risco_ambiental')
             st.selectbox("Risco Social/Trabalhista:", opcoes_risco, key='risco_social')
-    with st.expander("Fator 2: Histórico Operacional (Peso: 30%)"):
+    with st.expander("Fator 2: Histórico Operacional (Peso: 40%)"):
         c1, c2 = st.columns(2)
         with c1:
             st.selectbox("Experiência em projetos semelhantes:", ["Extensa e comprovada no segmento específico", "Experiência relevante em segmentos correlatos", "Experiência limitada ou em outros segmentos", "Iniciante/Nenhuma"], key='exp_similar')
@@ -1025,7 +1025,7 @@ with tab1:
             st.progress(min(cobertura_obra_perc, 1.0), text=f"Cobertura de Custo da Obra: {cobertura_obra_perc:.1%}")
             st.progress(min(cobertura_vendas_perc, 1.0), text=f"Cobertura da Dívida por Vendas: {cobertura_vendas_perc:.1%}")
     if st.button("Calcular Score do Pilar 1", use_container_width=True):
-        st.session_state.scores['pilar1'] = (calcular_score_governanca() * 0.3) + (calcular_score_operacional() * 0.3) + (calcular_score_financeiro() * 0.4)
+        st.session_state.scores['pilar1'] = (calcular_score_governanca() * 0.2) + (calcular_score_operacional() * 0.4) + (calcular_score_financeiro() * 0.4)
         st.plotly_chart(create_gauge_chart(st.session_state.scores['pilar1'], "Score Ponderado (Pilar 1)"), use_container_width=True)
     st.divider()
     st.subheader("🤖 Análise com IA Gemini")
@@ -1098,7 +1098,7 @@ with tab2:
             st.caption(f"Localização aproximada de {st.session_state.cidade_mapa}")
 
     else: # Carteira de Recebíveis
-        with st.expander("Fator 1: Qualidade da Carteira (Peso: 40%)", expanded=True):
+        with st.expander("Fator 1: Qualidade da Carteira (Peso: 45%)", expanded=True):
             c1, c2, c3 = st.columns(3)
             with c1: st.number_input("Saldo Devedor Total da Carteira (R$)", key='saldo_devedor_carteira')
             with c2: st.number_input("Valor de Avaliação Total das Garantias (R$)", key='valor_garantias_carteira')
@@ -1108,11 +1108,11 @@ with tab2:
                 st.metric("LTV Médio Calculado", f"{ltv_calculado:.2f}%")
             st.selectbox("Qualidade da política de crédito:", ["Robusta e bem documentada (score, DTI, etc.)", "Padrão de mercado", "Frouxa, ad-hoc ou desconhecida"], key='origem')
         
-        with st.expander("Fator 2: Performance Histórica (Peso: 40%)"):
+        with st.expander("Fator 2: Performance Histórica (Peso: 45%)"):
             st.number_input("Inadimplência da carteira (> 90 dias) (%)", key='inadimplencia')
             st.selectbox("Análise de safras (vintage):", ["Estável ou melhorando", "Com leve deterioração", "Com deterioração clara e preocupante"], key='vintage')
         
-        with st.expander("Fator 3: Concentração (Peso: 20%)"):
+        with st.expander("Fator 3: Concentração (Peso: 10%)"):
             st.number_input("Concentração nos 5 maiores devedores (%)", key='concentracao_top5')
         
         if st.button("Calcular Score do Pilar 2 (Carteira)", use_container_width=True):
