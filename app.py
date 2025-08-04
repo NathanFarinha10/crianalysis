@@ -773,30 +773,50 @@ def calcular_duration(df_fluxo, coluna_fluxo, taxa_yield_anual):
         st.error(f"Erro ao calcular o Duration: {e}")
         return 0.0
     
-def obter_spread_credito(rating, duration_anos):
-    """
-    Simula uma matriz de spread de crédito. Retorna o spread em % (ex: 2.5 para 2.5%).
-    O spread aumenta para ratings piores e durations mais longas.
-    """
-    # Matriz de Spread [Rating] -> (Duration Limite, Spread Base)
-    matriz_spread = {
-        'brAAA(sf)': [(3, 0.8), (7, 1.2), (99, 1.5)],
-        'brAA(sf)':  [(3, 1.2), (7, 1.6), (99, 2.0)],
-        'brA(sf)':   [(3, 1.8), (7, 2.2), (99, 2.8)],
-        'brBBB(sf)': [(3, 2.5), (7, 3.0), (99, 3.5)],
-        'brBB(sf)':  [(3, 4.0), (7, 4.8), (99, 5.5)],
-        'brB(sf)':   [(3, 6.0), (7, 7.0), (99, 8.0)],
-        'brCCC(sf)': [(3, 9.0), (7, 10.5), (99, 12.0)],
-    }
-    
-    spreads = matriz_spread.get(rating, [(99, 15.0)]) # Fallback para ratings não encontrados
-    
-    for duration_limite, spread in spreads:
-        if duration_anos <= duration_limite:
-            return spread
-            
-    return 15.0 # Fallback
+# SUBSTITUA A FUNÇÃO obter_spread_credito INTEIRA POR ESTA:
 
+def calcular_spread_credito_avancado(rating, duration_anos, op_volume, tipo_lastro):
+    """
+    Calcula um spread de crédito detalhado, somando componentes de risco.
+    Retorna o spread em % (ex: 2.5 para 2.5%).
+    """
+    # 1. Spread Base (pelo Rating) - Tabela com valores mais realistas
+    matriz_spread_base = {
+        'brAAA(sf)': 1.20, 'brAA(sf)':  1.60, 'brA(sf)':   2.10,
+        'brBBB(sf)': 2.80, 'brBB(sf)':  4.50, 'brB(sf)':   6.50,
+        'brCCC(sf)': 9.00,
+    }
+    base_spread = matriz_spread_base.get(rating, 12.00) # Usa 12% como fallback
+
+    # 2. Prêmio de Liquidez (pelo Volume da Emissão em R$)
+    # Emissões menores são menos líquidas e exigem prêmio maior.
+    if op_volume < 50_000_000:
+        liquidity_premium = 0.40 # 40 bps
+    elif op_volume < 200_000_000:
+        liquidity_premium = 0.20 # 20 bps
+    else:
+        liquidity_premium = 0.0 # 0 bps para emissões grandes
+
+    # 3. Prêmio Estrutural (pelo Risco do Lastro)
+    # Risco de projeto (obra) é maior que o risco de uma carteira de crédito performada.
+    if 'Desenvolvimento Imobiliário' in tipo_lastro:
+        structural_premium = 0.50 # 50 bps
+    elif 'Carteira de Recebíveis' in tipo_lastro:
+        structural_premium = 0.15 # 15 bps
+    else:
+        structural_premium = 0.30 # Fallback
+
+    # 4. Ajuste de Prazo (pela Duration)
+    # Adiciona/subtrai um prêmio com base na duration. Assumimos 4 anos como neutro.
+    # A cada ano acima de 4, adiciona 10 bps. A cada ano abaixo, subtrai.
+    duration_adjustment = (duration_anos - 4) * 0.10
+
+    # Soma todos os componentes para o spread final
+    total_spread = base_spread + liquidity_premium + structural_premium + duration_adjustment
+    
+    # Garante que o spread não seja negativo para durations muito curtas
+    return max(0.5, total_spread)
+    
 @st.cache_data
 def run_cashflow_simulation(cenario_premissas, saldo_lastro, saldo_cri_p5, taxa_lastro, taxa_cri_p5, prazo, despesas):
     taxa_inadimplencia_aa = cenario_premissas['inadimplencia'] / 100
@@ -1473,7 +1493,13 @@ with tab8:
         inflacao_implicita = ((1 + cdi_proj_dec) / (1 + taxa_ntnb_dec)) - 1 if taxa_ntnb_dec > -1 else 0
 
         # 2. Cálculo da Precificação da Série Sênior
-        spread_senior_dec = obter_spread_credito(rating_final_senior, duration_op) / 100
+        spread_senior = calcular_spread_credito_avancado(
+        rating_final_senior, 
+        duration_op, 
+        st.session_state.op_volume, 
+        st.session_state.tipo_lastro
+        )
+        spread_senior_dec = spread_senior / 100
         taxa_real_senior = taxa_ntnb_dec + spread_senior_dec
         taxa_nominal_senior = (1 + taxa_real_senior) * (1 + inflacao_implicita) - 1
         spread_cdi_senior = (taxa_nominal_senior - cdi_proj_dec) * 100
@@ -1482,7 +1508,13 @@ with tab8:
         taxa_final_ipca_sub, spread_cdi_sub, rating_sub = None, None, None
         if st.session_state.estrutura_tipo == "Múltiplas Séries (com subordinação)":
             rating_sub = ajustar_rating(rating_final_senior, -4)
-            spread_sub_dec = obter_spread_credito(rating_sub, duration_op) / 100
+            spread_sub = calcular_spread_credito_avancado(
+                rating_sub, 
+                duration_op, 
+                st.session_state.op_volume, 
+                st.session_state.tipo_lastro
+            )
+            spread_sub_dec = spread_sub / 100
             taxa_real_sub = taxa_ntnb_dec + spread_sub_dec
             taxa_nominal_sub = (1 + taxa_real_sub) * (1 + inflacao_implicita) - 1
             spread_cdi_sub = (taxa_nominal_sub - cdi_proj_dec) * 100
@@ -1502,8 +1534,8 @@ with tab8:
             with st.container(border=True):
                 st.markdown(f"<h5>Precificação da Série Subordinada ({rating_sub if rating_sub else 'N/A'})</h5>", unsafe_allow_html=True)
                 if spread_cdi_sub is not None:
-                    st.metric("Spread de Crédito sobre NTN-B", f"{obter_spread_credito(rating_sub, duration_op):.2f}%")
-                    st.warning(f"**Taxa Indicativa (IPCA): IPCA + {taxa_ntnb_input + obter_spread_credito(rating_sub, duration_op):.2f}% a.a.**")
+                    st.metric("Spread de Crédito sobre NTN-B", f"{spread_sub:.2f}%")
+                    st.warning(f"**Taxa Indicativa (IPCA): IPCA + {taxa_ntnb_input + spread_sub:.2f}% a.a.**")
                     st.info(f"**Taxa Indicativa (CDI): CDI + {spread_cdi_sub:.2f}% a.a.**")
                 else:
                     st.info("Não aplicável para operações de Série Única.")
