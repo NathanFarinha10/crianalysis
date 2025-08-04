@@ -837,16 +837,16 @@ with col1:
 
 with col2:
     st.title("Plataforma de Análise e Rating de CRI")
-    st.markdown("Desenvolvido em parceria com a IA 'Projeto de Análise e Rating de CRI v2'")
+    st.markdown("Highpar Asset Management")
 
 st.divider() # Adiciona uma linha divisória para um visual mais limpo
 
 inicializar_session_state()
 
-tab0, tab1, tab2, tab3, tab4, tab5, tab7, tab8, tab6 = st.tabs(["📝 Cadastro", "Pilar 1", "Pilar 2", "Pilar 3", "Pilar 4", "📊 Modelagem", "Viabilidade", "💰 Precificação", "Resultado"])
+tab0, tab1, tab2, tab3, tab4, tab5, tab7, tab8, tab6 = st.tabs(["Cadastro da Operação", "Devedor", "Lastro", "Estrutura e Garantias", "Jurídico e Governança", "Modelagem", "Viabilidade", "Precificação da Operação", "Resultado"])
 
 with tab0:
-    st.header("Informações Gerais da Operação (Folha de Rosto)")
+    st.header("Informações Gerais da Operação")
     st.markdown("Dados descritivos para identificação e composição do relatório final. **Não impactam o cálculo do rating.**")
     col1, col2 = st.columns(2)
     with col1:
