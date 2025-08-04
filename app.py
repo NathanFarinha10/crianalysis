@@ -1424,7 +1424,7 @@ with tab6:
         st.subheader("Deliberação Final do Comitê de Rating")
         col1, col2 = st.columns([1, 2])
         with col1:
-            st.number_input("Ajuste Qualitativo (notches)", min_value=-3, max_value=3, step=1, key='ajuste_final')
+            st.number_input("Ajuste Qualitativo (notches)", value=st.session_state.ajuste_final, min_value=-3, max_value=3, step=1, key='ajuste_final')
             rating_final_senior = ajustar_rating(rating_indicado, st.session_state.ajuste_final)
             st.metric("Rating Final Atribuído (Sênior)", value=rating_final_senior)
             if st.session_state.estrutura_tipo == "Múltiplas Séries (com subordinação)":
