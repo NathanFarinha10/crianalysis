@@ -262,6 +262,34 @@ def gerar_relatorio_pdf(ss):
     except Exception as e:
         st.error(f"Ocorreu um erro crítico ao gerar o PDF: {e}")
         return b''
+
+# ==============================================================================
+# FUNÇÕES DE CALLBACK PARA ANÁLISE COM IA
+# ==============================================================================
+
+def callback_gerar_analise_p1():
+    dados_p1_str = f"- Histórico: {st.session_state.hist_emissor}, Experiência Executivos: {st.session_state.exp_socios}\n- Histórico Sócios: {st.session_state.hist_socios}, UBOs: {st.session_state.ubo}\n- Conselho: {st.session_state.conselho}, Comitês: {'Sim' if st.session_state.comites else 'Não'}\n- Auditoria: {st.session_state.auditoria}, Ressalvas: {'Sim' if st.session_state.ressalvas else 'Não'}\n- Riscos Específicos (Jurídico, Ambiental, Social): {st.session_state.risco_juridico}, {st.session_state.risco_ambiental}, {st.session_state.risco_social}"
+    with st.spinner("Analisando o Pilar 1..."):
+        st.session_state.analise_p1 = gerar_analise_ia("Pilar 1: Originador e Devedor", dados_p1_str)
+
+def callback_gerar_analise_p2():
+    dados_p2_str = ""
+    if st.session_state.tipo_lastro == 'Desenvolvimento Imobiliário (Risco de Projeto)':
+        dados_p2_str = f"- Tipo: Desenvolvimento Imobiliário\n- Segmento: {st.session_state.segmento_projeto}\n- Localização: {st.session_state.microlocalizacao} em {st.session_state.qualidade_municipio}\n- Performance: IVV de {st.session_state.get('ivv_calculado', 0):.2f}%, VGV vendido: {st.session_state.vgv_vendido_perc}%\n- Execução: {st.session_state.avanco_fisico_obra}% da obra concluída, Cronograma: {st.session_state.cronograma}"
+    else:
+        dados_p2_str = f"- Tipo: Carteira de Recebíveis\n- Qualidade: LTV Médio de {st.session_state.get('ltv_medio_carteira', 0):.2f}%, Originação: {st.session_state.origem}\n- Performance: Inadimplência>90d de {st.session_state.inadimplencia}%, Safras: {st.session_state.vintage}\n- Concentração (Top 5): {st.session_state.concentracao_top5}%"
+    with st.spinner("Analisando o Pilar 2..."):
+        st.session_state.analise_p2 = gerar_analise_ia("Pilar 2: Lastro", dados_p2_str)
+
+def callback_gerar_analise_p3():
+    dados_p3_str = f"- Estrutura: {st.session_state.estrutura_tipo}\n- Subordinação: {st.session_state.subordinacao if st.session_state.estrutura_tipo != 'Série Única' else 'N/A'}%\n- Waterfall: {st.session_state.waterfall}\n- Reforços: Fundo de Reserva ({st.session_state.fundo_reserva_pmts} PMTs), Sobrecolateralização ({st.session_state.sobrecolateralizacao}%), Spread ({st.session_state.spread_excedente}%)\n- Garantias: {', '.join(st.session_state.tipo_garantia)}, LTV: {st.session_state.ltv_garantia}%"
+    with st.spinner("Analisando o Pilar 3..."):
+        st.session_state.analise_p3 = gerar_analise_ia("Pilar 3: Estrutura", dados_p3_str)
+
+def callback_gerar_analise_p4():
+    dados_p4_str = f"- Conflitos: {st.session_state.independencia}, Retenção de Risco: {'Sim' if st.session_state.retencao_risco else 'Não'}\n- Prestadores: Agente Fiduciário ({st.session_state.ag_fiduciario}), Securitizadora ({st.session_state.securitizadora})\n- Contratual: Covenants ({st.session_state.covenants}), Pareceres ({st.session_state.pareceres})"
+    with st.spinner("Analisando o Pilar 4..."):
+        st.session_state.analise_p4 = gerar_analise_ia("Pilar 4: Jurídico e Governança", dados_p4_str)
         
 # ==============================================================================
 # FUNÇÕES DE CÁLCULO DE SCORE (LÓGICA INVERTIDA: 5 = MELHOR, 1 = PIOR)
@@ -999,10 +1027,11 @@ with tab1:
         st.plotly_chart(create_gauge_chart(st.session_state.scores['pilar1'], "Score Ponderado (Pilar 1)"), use_container_width=True)
     st.divider()
     st.subheader("🤖 Análise com IA Gemini")
-    if st.button("Gerar Análise Qualitativa para o Pilar 1", key="ia_pilar1", use_container_width=True):
-        dados_p1_str = f"- Histórico: {st.session_state.hist_emissor}, Experiência Executivos: {st.session_state.exp_socios}\n- Histórico Sócios: {st.session_state.hist_socios}, UBOs: {st.session_state.ubo}\n- Conselho: {st.session_state.conselho}, Comitês: {'Sim' if st.session_state.comites else 'Não'}\n- Auditoria: {st.session_state.auditoria}, Ressalvas: {'Sim' if st.session_state.ressalvas else 'Não'}\n- Riscos Específicos (Jurídico, Ambiental, Social): {st.session_state.risco_juridico}, {st.session_state.risco_ambiental}, {st.session_state.risco_social}"
-        with st.spinner("Analisando o Pilar 1..."):
-            st.session_state.analise_p1 = gerar_analise_ia("Pilar 1: Originador e Devedor", dados_p1_str)
+    st.button(
+        "Gerar Análise Qualitativa para o Pilar 1",
+        on_click=callback_gerar_analise_p1,
+        use_container_width=True
+    )
     if "analise_p1" in st.session_state:
         with st.container(border=True): st.markdown(st.session_state.analise_p1)
 
@@ -1090,14 +1119,11 @@ with tab2:
 
     st.divider()
     st.subheader("🤖 Análise com IA Gemini")
-    if st.button("Gerar Análise Qualitativa para o Pilar 2", key="ia_pilar2", use_container_width=True):
-        dados_p2_str = ""
-        if st.session_state.tipo_lastro == 'Desenvolvimento Imobiliário (Risco de Projeto)':
-            dados_p2_str = f"- Tipo: Desenvolvimento Imobiliário\n- Segmento: {st.session_state.segmento_projeto}\n- Localização: {st.session_state.microlocalizacao} em {st.session_state.qualidade_municipio}\n- Performance: IVV de {st.session_state.ivv_calculado:.2f}%, VGV vendido: {st.session_state.vgv_vendido_perc}%\n- Execução: {st.session_state.avanco_fisico_obra}% da obra concluída, Cronograma: {st.session_state.cronograma}"
-        else:
-            dados_p2_str = f"- Tipo: Carteira de Recebíveis\n- Qualidade: LTV Médio de {st.session_state.ltv_medio_carteira:.2f}%, Originação: {st.session_state.origem}\n- Performance: Inadimplência>90d de {st.session_state.inadimplencia}%, Safras: {st.session_state.vintage}\n- Concentração (Top 5): {st.session_state.concentracao_top5}%"
-        with st.spinner("Analisando o Pilar 2..."):
-            st.session_state.analise_p2 = gerar_analise_ia("Pilar 2: Lastro", dados_p2_str)
+    st.button(
+        "Gerar Análise Qualitativa para o Pilar 2",
+        on_click=callback_gerar_analise_p2,
+        use_container_width=True
+    )
     if "analise_p2" in st.session_state:
         with st.container(border=True): st.markdown(st.session_state.analise_p2)
 
@@ -1129,10 +1155,11 @@ with tab3:
         st.plotly_chart(create_gauge_chart(st.session_state.scores['pilar3'], "Score Ponderado (Pilar 3)"), use_container_width=True)
     st.divider()
     st.subheader("🤖 Análise com IA Gemini")
-    if st.button("Gerar Análise Qualitativa para o Pilar 3", key="ia_pilar3", use_container_width=True):
-        dados_p3_str = f"- Estrutura: {st.session_state.estrutura_tipo}\n- Subordinação: {st.session_state.subordinacao if st.session_state.estrutura_tipo != 'Série Única' else 'N/A'}%\n- Waterfall: {st.session_state.waterfall}\n- Reforços: Fundo de Reserva ({st.session_state.fundo_reserva_pmts} PMTs), Sobrecolateralização ({st.session_state.sobrecolateralizacao}%), Spread ({st.session_state.spread_excedente}%)\n- Garantias: {', '.join(st.session_state.tipo_garantia)}, LTV: {st.session_state.ltv_garantia}%"
-        with st.spinner("Analisando o Pilar 3..."):
-            st.session_state.analise_p3 = gerar_analise_ia("Pilar 3: Estrutura", dados_p3_str)
+    st.button(
+        "Gerar Análise Qualitativa para o Pilar 3",
+        on_click=callback_gerar_analise_p3,
+        use_container_width=True
+    )
     if "analise_p3" in st.session_state:
         with st.container(border=True): st.markdown(st.session_state.analise_p3)
 
@@ -1156,10 +1183,11 @@ with tab4:
         st.plotly_chart(create_gauge_chart(st.session_state.scores['pilar4'], "Score Ponderado (Pilar 4)"), use_container_width=True)
     st.divider()
     st.subheader("🤖 Análise com IA Gemini")
-    if st.button("Gerar Análise Qualitativa para o Pilar 4", key="ia_pilar4", use_container_width=True):
-        dados_p4_str = f"- Conflitos: {st.session_state.independencia}, Retenção de Risco: {'Sim' if st.session_state.retencao_risco else 'Não'}\n- Prestadores: Agente Fiduciário ({st.session_state.ag_fiduciario}), Securitizadora ({st.session_state.securitizadora})\n- Contratual: Covenants ({st.session_state.covenants}), Pareceres ({st.session_state.pareceres})"
-        with st.spinner("Analisando o Pilar 4..."):
-            st.session_state.analise_p4 = gerar_analise_ia("Pilar 4: Jurídico e Governança", dados_p4_str)
+    st.button(
+        "Gerar Análise Qualitativa para o Pilar 4",
+        on_click=callback_gerar_analise_p4,
+        use_container_width=True
+    )
     if "analise_p4" in st.session_state:
         with st.container(border=True): st.markdown(st.session_state.analise_p4)
 
