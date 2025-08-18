@@ -217,12 +217,12 @@ class PDF(FPDF):
             line_encoded = self._write_text(line)
             if line.startswith('**'):
                 self.set_font('Arial', 'B', 10)
-                self.multi_cell(0, 5, line_encoded.replace('**', ''))
+                self.write(5, line_encoded.replace('**', ''))
                 self.set_font('Arial', '', 10)
             elif line.strip().startswith('* '):
-                self.multi_cell(0, 5, f"  - {line_encoded.strip().replace('* ', '')}")
+                self.write(5, f"  - {line_encoded.strip().replace('* ', '')}")
             else:
-                self.multi_cell(0, 5, line_encoded)
+                self.write(5, line_encoded)
         self.ln(5)
 
 def gerar_relatorio_pdf(ss):
@@ -242,8 +242,8 @@ def gerar_relatorio_pdf(ss):
         pdf.cell(0, 10, f"Score Final Ponderado: {score_final_ponderado:.2f}", 0, 1)
         pdf.cell(0, 10, f"Rating Final (Série Sênior): {rating_final_senior}", 0, 1)
         pdf.set_font('Arial', 'B', 10)
-        pdf.multi_cell(0, 10, pdf._write_text(f"Justificativa do Comitê: {ss.justificativa_final}"))
-        pdf.ln(5)
+        pdf.write(5, pdf._write_text(f"Justificativa do Comitê: {ss.justificativa_final}"))
+        pdf.ln(10)
         
         pdf.chapter_title('3. Análise Qualitativa com IA Gemini')
         for i in range(1, 5):
