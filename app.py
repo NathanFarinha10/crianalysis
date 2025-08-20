@@ -133,8 +133,11 @@ def converter_score_para_rating(score):
     elif score >= 3.75: return 'brA(sf)'
     elif score >= 3.25: return 'brBBB(sf)'
     elif score >= 2.75: return 'brBB(sf)'
-    elif score >= 2.00: return 'brB(sf)'
-    else: return 'brCCC(sf)'
+    elif score >= 2.50: return 'brB(sf)'
+    elif score >= 2.25: return 'brCCC(sf)'
+    elif score >= 2.00: return 'brCC(sf)'
+    elif score >= 1.50: return 'brC(sf)'
+    else: return 'brD(sf)'
 
 def ajustar_rating(rating_base, notches):
     escala = ['brCCC(sf)', 'brB(sf)', 'brBB(sf)', 'brBBB(sf)', 'brA(sf)', 'brAA(sf)', 'brAAA(sf)']
