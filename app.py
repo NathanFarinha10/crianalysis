@@ -1425,11 +1425,58 @@ with tab6:
         col1, col2 = st.columns([1, 2])
         with col1:
             st.number_input("Ajuste Qualitativo (notches)", value=st.session_state.ajuste_final, min_value=-3, max_value=3, step=1, key='ajuste_final')
+            # CÓDIGO NOVO (LÓGICA DO RATING SUBORDINADO POR NOTCHING DINÂMICO)
+
             rating_final_senior = ajustar_rating(rating_indicado, st.session_state.ajuste_final)
             st.metric("Rating Final Atribuído (Sênior)", value=rating_final_senior)
+            
             if st.session_state.estrutura_tipo == "Múltiplas Séries (com subordinação)":
-                rating_subordinada_indicado = ajustar_rating(rating_final_senior, -4)
-                st.metric("Rating Indicativo (Subordinada)", value=rating_subordinada_indicado)
+                # 1. Definir o notch base de rebaixamento
+                notch_base = -4
+                ajustes_texto = [f"Base: {notch_base}"]
+            
+                # 2. Ajuste pelo Nível de Subordinação
+                sub_level = st.session_state.subordinacao
+                ajuste_sub = 0
+                if sub_level > 20:
+                    ajuste_sub = 2
+                elif sub_level < 10:
+                    ajuste_sub = -2
+                if ajuste_sub != 0:
+                    ajustes_texto.append(f"Subordinação: {ajuste_sub:+} ")
+            
+                # 3. Ajuste pela Qualidade do Lastro (Score do Pilar 2)
+                score_lastro = st.session_state.scores.get('pilar2', 3.5)
+                ajuste_lastro = 0
+                if score_lastro > 4.0:
+                    ajuste_lastro = 1
+                elif score_lastro < 3.25:
+                    ajuste_lastro = -1
+                if ajuste_lastro != 0:
+                    ajustes_texto.append(f"Lastro: {ajuste_lastro:+} ")
+            
+                # 4. Ajuste por Reforços Adicionais
+                fundo_reserva = st.session_state.fundo_reserva_pmts
+                sobrecol = st.session_state.sobrecolateralizacao
+                ajuste_reforcos = 0
+                if fundo_reserva >= 3 and sobrecol >= 115:
+                    ajuste_reforcos = 1
+                if ajuste_reforcos != 0:
+                    ajustes_texto.append(f"Reforços: {ajuste_reforcos:+} ")
+            
+                # 5. Calcular o ajuste final e o rating
+                ajuste_total_notches = notch_base + ajuste_sub + ajuste_lastro + ajuste_reforcos
+                rating_subordinada = ajustar_rating(rating_final_senior, ajuste_total_notches)
+                
+                # Montar o texto de ajuda para transparência
+                help_text = f"Cálculo: {ajuste_total_notches} notches ({', '.join(ajustes_texto)})"
+            
+                st.metric(
+                    "Rating Indicativo (Subordinada)", 
+                    value=rating_subordinada,
+                    help=help_text
+                )
+            
             else:
                 st.metric("Rating Indicativo (Subordinada)", value="Não Aplicável")
         with col2:
